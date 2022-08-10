@@ -2,4 +2,4 @@
 Contributors
 ============
 
-* Mike Lynch <mlynch@sydney.edu.au>
+* Mike Lynch <m.lynch@sydney.edu.au>
