@@ -7,6 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from nswcaselaw import __version__
+from nswcaselaw.constants import CASELAW_SEARCH_URL, COURTS
 
 __author__ = "Mike Lynch"
 __copyright__ = "The University of Sydney"
@@ -14,7 +15,6 @@ __license__ = "MIT"
 
 _logger = logging.getLogger(__name__)
 
-CASELAW_SEARCH_URL = "https://www.caselaw.nsw.gov.au/search/advanced"
 # WAIT_TIME
 
 
@@ -91,6 +91,13 @@ def parse_args(args):
         const=logging.DEBUG,
     )
     parser.add_argument(
+        "--list",
+        type=str,
+        default="courts",
+        choices=["courts", "tribunals"],
+        help="Print a list of courts or tribunals",
+    )
+    parser.add_argument(
         "--body",
         type=str,
         help="Free text search of the entire judgment",
@@ -110,6 +117,14 @@ def setup_logging(loglevel):
     )
 
 
+def list_courts(court_type: str):
+    """
+    Print a list of courts or tribunals, with indices, to stdout
+    """
+    for index, (_, name) in enumerate(COURTS[court_type]):
+        print(f"{index + 1:2d}. {name}")
+
+
 def main(args):
     """Wrapper allowing :func:`fib` to be called with string arguments in a CLI fashion
 
@@ -122,9 +137,12 @@ def main(args):
     """
     args = parse_args(args)
     setup_logging(args.loglevel)
-    search = Search({"body": args.body})
-    for r in search.results():
-        print(r)
+    if args.list:
+        list_courts(args.list)
+    else:
+        search = Search({"body": args.body})
+        for r in search.results():
+            print(r)
 
 
 def run():
