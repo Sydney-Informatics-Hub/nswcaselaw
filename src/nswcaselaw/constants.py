@@ -84,8 +84,12 @@ def fetch_courts() -> Dict[str, List[Tuple[str, str]]]:
     return None
 
 
-def index_to_court(court_type: str, court_id: int) -> Tuple[str, str]:
+def court_id(court_type: str, court_idx: int) -> Tuple[str, str]:
     """
     Return the tuple for court or tribunal n, starting at 1
     """
-    return COURTS[court_type][court_id + 1]
+    if court_type not in COURTS:
+        raise ValueError("Unknown court type")
+    if court_idx < 1 or court_idx > len(COURTS[court_type]):
+        raise ValueError("Court index out of range")
+    return COURTS[court_type][court_idx + 1]

@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import sys
 from typing import Dict, List
@@ -7,7 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from nswcaselaw import __version__
-from nswcaselaw.constants import CASELAW_SEARCH_URL, COURTS
+from nswcaselaw.constants import CASELAW_SEARCH_URL, COURTS, court_id
 
 __author__ = "Mike Lynch"
 __copyright__ = "The University of Sydney"
@@ -93,14 +94,35 @@ def parse_args(args):
     parser.add_argument(
         "--list",
         type=str,
-        default="courts",
         choices=["courts", "tribunals"],
         help="Print a list of courts or tribunals",
     )
+    parser.add_argument("--body", type=str, help="Full text search")
+    parser.add_argument("--title", type=str, help="Case name")
     parser.add_argument(
-        "--body",
+        "--before",
         type=str,
-        help="Free text search of the entire judgment",
+        help="Judge, commissioner, magistrate, member, registrar or assessor",
+    )
+    parser.add_argument("--catchwords", type=str)
+    parser.add_argument("--party", type=str)
+    parser.add_argument("--citation", type=str, help="Must include square brackets")
+    parser.add_argument("--startDate", type=str, help="Earliest decision date")
+    parser.add_argument("--endDate", type=str, help="Lastest decision date")
+    parser.add_argument("--fileNumber", type=str)
+    parser.add_argument("--legislationCited", type=str)
+    parser.add_argument("--casesCited", type=str)
+    parser.add_argument(
+        "--courts",
+        type=int,
+        nargs="+",
+        help="Select one or more by index number (see --list courts)",
+    )
+    parser.add_argument(
+        "--tribunals",
+        type=int,
+        nargs="+",
+        help="Select one or more by index number (see --list tribunals)",
     )
     return parser.parse_args(args)
 
@@ -125,6 +147,40 @@ def list_courts(court_type: str):
         print(f"{index + 1:2d}. {name}")
 
 
+def args_to_query(args: argparse.Namespace) -> Dict[str, str]:
+    """
+    Build the query dictionary from the command-line args
+    """
+    query = {}
+    if args.body:
+        query["body"] = args.body
+    if args.title:
+        query["title"] = args.title
+    if args.before:
+        query["before"] = args.before
+    if args.catchwords:
+        query["catchwords"] = args.catchwords
+    if args.party:
+        query["party"] = args.party
+    if args.citation:
+        query["mnc"] = args.citation
+    if args.startDate:
+        query["startDate"] = args.startDate
+    if args.endDate:
+        query["endDate"] = args.endDate
+    if args.fileNumber:
+        query["fileNumber"] = args.fileNumber
+    if args.legislationCited:
+        query["legislationCited"] = args.legislationCited
+    if args.casesCited:
+        query["casesCited"] = args.casesCited
+    if args.courts:
+        query["courts"] = [court_id("courts", c)[0] for c in args.courts]
+    if args.tribunals:
+        query["tribunals"] = [court_id("tribunals", c)[0] for c in args.tribunals]
+    return query
+
+
 def main(args):
     """Wrapper allowing :func:`fib` to be called with string arguments in a CLI fashion
 
@@ -140,9 +196,14 @@ def main(args):
     if args.list:
         list_courts(args.list)
     else:
-        search = Search({"body": args.body})
-        for r in search.results():
-            print(r)
+        if not (args.courts or args.tribunals):
+            _logger.error("You must select at least one court or tribunal")
+        else:
+            query = args_to_query(args)
+            print(json.dumps(query, indent=2))
+            # search = Search(query)
+            # for r in search.results():
+            #     print(r)
 
 
 def run():
