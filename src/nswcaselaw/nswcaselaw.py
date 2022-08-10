@@ -1,7 +1,7 @@
 import argparse
 import logging
 import sys
-from typing import Mapping
+from typing import Dict, List
 
 import requests
 from bs4 import BeautifulSoup
@@ -24,11 +24,11 @@ class Search:
     of search parameters.
     """
 
-    def __init__(self, search: Mapping[str:str]):
+    def __init__(self, search: Dict[str, str]):
         self._search = search
 
     @property
-    def search(self) -> Mapping[str:str]:
+    def search(self) -> Dict[str, str]:
         return self._search
 
     def results(self):
@@ -40,7 +40,7 @@ class Search:
                 yield result
             # request next page, if appropriate, after a wait
 
-    def scrape_results(r: requests.Response) -> list[str]:
+    def scrape_results(r: requests.Response) -> List[str]:
         soup = BeautifulSoup(requests.body, "html.parser")
         links = [a.href for a in soup.find_all("a")]
         return links
