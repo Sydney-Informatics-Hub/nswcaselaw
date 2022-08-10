@@ -14,8 +14,12 @@ __license__ = "MIT"
 
 _logger = logging.getLogger(__name__)
 
-CASELAW_SEARCH_URL = "https://www.caselaw.nsw.gov.au/advancedsearch"
+CASELAW_SEARCH_URL = "https://www.caselaw.nsw.gov.au/search/advanced"
 # WAIT_TIME
+
+
+class CaseLawException(Exception):
+    pass
 
 
 class Search:
@@ -38,11 +42,13 @@ class Search:
             results = self.scrape_results(r)
             for result in results:
                 yield result
+        else:
+            raise CaseLawException(f"Bad status_code {r.status_code}")
             # request next page, if appropriate, after a wait
 
-    def scrape_results(r: requests.Response) -> List[str]:
-        soup = BeautifulSoup(requests.body, "html.parser")
-        links = [a.href for a in soup.find_all("a")]
+    def scrape_results(self, r: requests.Response) -> List[str]:
+        soup = BeautifulSoup(r.text, "html.parser")
+        links = soup.find_all("a")
         return links
 
 
@@ -84,6 +90,11 @@ def parse_args(args):
         action="store_const",
         const=logging.DEBUG,
     )
+    parser.add_argument(
+        "--body",
+        type=str,
+        help="Free text search of the entire judgment",
+    )
     return parser.parse_args(args)
 
 
@@ -111,8 +122,9 @@ def main(args):
     """
     args = parse_args(args)
     setup_logging(args.loglevel)
-    #  run a search or get a case
-    # print("The {}-th Fibonacci number is {}".format(args.n, fib(args.n)))
+    search = Search({"body": args.body})
+    for r in search.results():
+        print(r)
 
 
 def run():
