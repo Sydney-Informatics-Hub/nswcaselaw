@@ -35,6 +35,60 @@ class CaseLawException(Exception):
     pass
 
 
+class Decision:
+    def __init__(self, **kwargs):
+        self._title = kwargs.get("title")
+        self._before = kwargs.get("before")
+        self._date = kwargs.get("date")
+        self._catchwords = kwargs.get("catchwords")
+        self._uri = kwargs.get("uri")
+
+    def __repr__(self):
+        """
+        Returns the decision fields which are available from the search
+        results page as a comma-separated list in quotes.
+        """
+        return ",".join(
+            [
+                f'"{p}"'
+                for p in [
+                    self._title,
+                    self._uri,
+                    self._date,
+                    self._before,
+                    self._catchwords,
+                ]
+            ]
+        )
+
+    @property
+    def title(self):
+        return self._title
+
+    @property
+    def before(self):
+        return self._before
+
+    @property
+    def date(self):
+        return self._date
+
+    @property
+    def catchwords(self):
+        return self._catchwords
+
+    @property
+    def link(self):
+        return self._uri
+
+    def fetch(self):
+        """
+        Load and scrape the body of this decision
+        """
+        # todo
+        pass
+
+
 class Search:
     """
     Class representing a CaseLaw query. Intialise it with a dictionary
@@ -74,7 +128,7 @@ class Search:
         _logger.info("Fetching page 1...")
         r = requests.get(CASELAW_SEARCH_URL, self._params)
         if r.status_code == 200:
-            n_results, results = self.scrape_results(r)
+            n_results, results = self.scrape_results(r.text)
             for result in results:
                 yield result
         n_pages = (n_results - 1) // PAGE_SIZE + 1
@@ -84,18 +138,51 @@ class Search:
             _logger.info(f"Fetching page {page + 1} of {n_pages}...")
             r = requests.get(CASELAW_SEARCH_URL, self._params)
             if r.status_code == 200:
-                n, results = self.scrape_results(r)
+                n, results = self.scrape_results(r.text)
                 for result in results:
                     yield result
             else:
                 raise CaseLawException(f"Bad status_code {r.status_code}")
 
-    def scrape_results(self, r: requests.Response) -> List[str]:
-        soup = BeautifulSoup(r.text, "html.parser")
+    def scrape_results(self, html) -> List[str]:
+        soup = BeautifulSoup(html, "html.parser")
         header_strings = list(soup.find("h1").stripped_strings)
         m = RESULTS_RE.match(header_strings[1])
         if not m:
             raise CaseLawException("Couldn't get number of results from HTML")
-        results = int(m[1])
-        decisions = [a for a in soup.find_all("a") if a["href"][:9] == "/decision"]
-        return results, decisions
+        n_results = int(m[1])
+        results = soup.find_all("div", {"class": "row result"})
+        decisions = [self.scrape_decision(r) for r in results]
+        return n_results, decisions
+
+    def scrape_decision(self, row):
+        try:
+            header = row.find("h4")
+            link = header.find("a")
+            uri = link["href"]
+            title = "".join(link.stripped_strings)
+            before = ""
+            date = ""
+            catchwords = ""
+            divs = [d for d in header.next_siblings if d.name == "div"]
+            if divs:
+                cps = divs[0].find_all("p")
+                if len(cps) > 1:
+                    catchwords = "".join(cps[1].stripped_strings)
+            ul = row.find("ul")
+            if ul:
+                values = ul.find_all("li", {"class": "list-group-item"})
+                if len(values) >= 2:
+                    before = "".join(values[1].stripped_strings)
+                if len(values) >= 4:
+                    date = "".join(values[3].stripped_strings)
+            return Decision(
+                title=title,
+                uri=uri,
+                catchwords=catchwords,
+                before=before,
+                date=date,
+            )
+        except Exception as e:
+            _logger.warn(f"HTML parse error {e}")
+            return None

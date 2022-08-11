@@ -145,11 +145,7 @@ def args_to_query(args: argparse.Namespace) -> Dict[str, str]:
 
 
 def main(args):
-    """Wrapper allowing :func:`fib` to be called with string arguments in a CLI fashion
-
-    Instead of returning the value from :func:`fib`, it prints the result to the
-    ``stdout`` in a nicely formatted message.
-
+    """
     Args:
       args (List[str]): command line parameters as list of strings
           (for example  ``["--verbose", "42"]``).
