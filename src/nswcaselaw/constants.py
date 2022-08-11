@@ -92,4 +92,4 @@ def court_id(court_type: str, court_idx: int) -> Tuple[str, str]:
         raise ValueError("Unknown court type")
     if court_idx < 1 or court_idx > len(COURTS[court_type]):
         raise ValueError("Court index out of range")
-    return COURTS[court_type][court_idx + 1]
+    return COURTS[court_type][court_idx - 1]

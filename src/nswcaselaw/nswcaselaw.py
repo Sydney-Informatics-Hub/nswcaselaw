@@ -1,14 +1,11 @@
 import argparse
-import json
 import logging
 import sys
-from typing import Dict, List
-
-import requests
-from bs4 import BeautifulSoup
+from typing import Dict
 
 from nswcaselaw import __version__
-from nswcaselaw.constants import CASELAW_SEARCH_URL, COURTS, court_id
+from nswcaselaw.constants import COURTS, court_id
+from nswcaselaw.search import Search
 
 __author__ = "Mike Lynch"
 __copyright__ = "The University of Sydney"
@@ -17,40 +14,6 @@ __license__ = "MIT"
 _logger = logging.getLogger(__name__)
 
 # WAIT_TIME
-
-
-class CaseLawException(Exception):
-    pass
-
-
-class Search:
-    """
-    Class representing a CaseLaw query. Intialise it with a dictionary
-    of search parameters.
-    """
-
-    def __init__(self, search: Dict[str, str]):
-        self._search = search
-
-    @property
-    def search(self) -> Dict[str, str]:
-        return self._search
-
-    def results(self):
-        """yield results until we've finished"""
-        r = requests.get(CASELAW_SEARCH_URL, self._search)
-        if r.status_code == 200:
-            results = self.scrape_results(r)
-            for result in results:
-                yield result
-        else:
-            raise CaseLawException(f"Bad status_code {r.status_code}")
-            # request next page, if appropriate, after a wait
-
-    def scrape_results(self, r: requests.Response) -> List[str]:
-        soup = BeautifulSoup(r.text, "html.parser")
-        links = soup.find_all("a")
-        return links
 
 
 # ---- CLI ----
@@ -200,10 +163,9 @@ def main(args):
             _logger.error("You must select at least one court or tribunal")
         else:
             query = args_to_query(args)
-            print(json.dumps(query, indent=2))
-            # search = Search(query)
-            # for r in search.results():
-            #     print(r)
+            search = Search(query)
+            for r in search.results():
+                print(r)
 
 
 def run():
