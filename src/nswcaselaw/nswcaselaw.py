@@ -1,7 +1,6 @@
 import argparse
 import logging
 import sys
-from typing import Dict
 
 from nswcaselaw import __version__
 from nswcaselaw.constants import COURTS, court_id
@@ -79,12 +78,14 @@ def parse_args(args):
         "--courts",
         type=int,
         nargs="+",
+        default=[],
         help="Select one or more by index number (see --list courts)",
     )
     parser.add_argument(
         "--tribunals",
         type=int,
         nargs="+",
+        default=[],
         help="Select one or more by index number (see --list tribunals)",
     )
     return parser.parse_args(args)
@@ -110,40 +111,6 @@ def list_courts(court_type: str):
         print(f"{index + 1:2d}. {name}")
 
 
-def args_to_query(args: argparse.Namespace) -> Dict[str, str]:
-    """
-    Build the query dictionary from the command-line args
-    """
-    query = {}
-    if args.body:
-        query["body"] = args.body
-    if args.title:
-        query["title"] = args.title
-    if args.before:
-        query["before"] = args.before
-    if args.catchwords:
-        query["catchwords"] = args.catchwords
-    if args.party:
-        query["party"] = args.party
-    if args.citation:
-        query["mnc"] = args.citation
-    if args.startDate:
-        query["startDate"] = args.startDate
-    if args.endDate:
-        query["endDate"] = args.endDate
-    if args.fileNumber:
-        query["fileNumber"] = args.fileNumber
-    if args.legislationCited:
-        query["legislationCited"] = args.legislationCited
-    if args.casesCited:
-        query["casesCited"] = args.casesCited
-    if args.courts:
-        query["courts"] = [court_id("courts", c)[0] for c in args.courts]
-    if args.tribunals:
-        query["tribunals"] = [court_id("tribunals", c)[0] for c in args.tribunals]
-    return query
-
-
 def main(args):
     """
     Args:
@@ -158,9 +125,24 @@ def main(args):
         if not (args.courts or args.tribunals):
             _logger.error("You must select at least one court or tribunal")
         else:
-            query = args_to_query(args)
-            search = Search(query)
-            for r in search.results():
+            courts = [court_id("courts", c)[0] for c in args.courts]
+            tribunals = [court_id("tribunals", c)[0] for c in args.tribunals]
+            search = Search(
+                body=args.body,
+                title=args.title,
+                before=args.before,
+                catchwords=args.catchwords,
+                party=args.party,
+                mnc=args.citation,
+                startDate=args.startDate,
+                endDate=args.endDate,
+                fileNumber=args.fileNumber,
+                legislationCited=args.legislationCited,
+                casesCited=args.casesCited,
+                courts=courts,
+                tribunals=tribunals,
+            )
+            for r in search.query():
                 print(r)
 
 

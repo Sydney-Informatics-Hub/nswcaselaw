@@ -1,7 +1,7 @@
 import logging
 import re
 import time
-from typing import Dict, List, Tuple
+from typing import Generator, List, Tuple
 
 import requests
 from bs4 import BeautifulSoup
@@ -25,6 +25,8 @@ TEXT_FIELDS = [
     "casesCited",
 ]
 
+COURTS_FIELDS = ["courts", "tribunals"]
+
 RESULTS_RE = re.compile(r"Displaying \d+ - \d+ of (\d+)")
 PAGE_SIZE = 20
 
@@ -36,6 +38,13 @@ class CaseLawException(Exception):
 
 
 class Decision:
+    """
+    Class representing a Decision in CaseLaw. These are returned by the
+    Search object with the metadata which is given in the results page.
+    The rest of the object's data can be retrieved with the Decision's
+    fetch method.
+    """
+
     def __init__(self, **kwargs):
         self._title = kwargs.get("title")
         self._before = kwargs.get("before")
@@ -85,7 +94,7 @@ class Decision:
         """
         Load and scrape the body of this decision
         """
-        # todo
+
         pass
 
 
@@ -95,23 +104,32 @@ class Search:
     of search parameters.
     """
 
-    def __init__(self, query_args: Dict[str, str]):
-        self._search = query_args
+    def __init__(self, **kwargs):
+        self._query = {}
+        for field in TEXT_FIELDS:
+            self._query[field] = kwargs.get(field)
+        for field in COURTS_FIELDS:
+            self._query[field] = kwargs.get(field)
         self._params = None
 
-    @property
-    def search(self) -> Dict[str, str]:
-        return self._search
-
     def build_query(self):
+        """
+        Converts the dict of search params into a list of tuples which can
+        be passed through requests. The reason for this is to imitate the
+        courts/tribunals selector
+        """
         self._params = [("page", "")]  # initial query has no page
         self._params.extend(
-            [(field, self._search.get(field, "")) for field in TEXT_FIELDS]
+            [(field, self._query.get(field, "")) for field in TEXT_FIELDS]
         )
-        self._params.extend(self.courts_query("courts", self._search["courts"]))
-        self._params.extend(self.courts_query("tribunals", self._search["courts"]))
+        for field in COURTS_FIELDS:
+            self._params.extend(self.courts_query(field, self._query[field]))
 
     def courts_query(self, court_type: str, indices: List[int]) -> List[Tuple[str]]:
+        """
+        Generates a big list of court or tribunal params with the ones the
+        user has selected switched on.
+        """
         params = []
         for court in COURTS[court_type]:
             if court[0] in indices:
@@ -119,10 +137,11 @@ class Search:
             params.append(("_" + court_type, "on"))
         return params
 
-    def results(self):
+    def query(self) -> Generator[Decision, None, None]:
         """
-        Pages through search results until we've finished, pausing for PAUSE_SECONDS
-        before the next request.
+        Runs a query against CaseLaw, repeating it for as many pages as are
+        needed to get all of the matching results. Pauses between pages so that
+        we don't get banned.
         """
         self.build_query()
         _logger.info("Fetching page 1...")
