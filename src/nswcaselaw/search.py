@@ -1,9 +1,15 @@
+import logging
+import re
+import time
 from typing import Dict, List, Tuple
 
 import requests
 from bs4 import BeautifulSoup
 
 from nswcaselaw.constants import CASELAW_SEARCH_URL, COURTS
+
+_logger = logging.getLogger(__name__)
+
 
 TEXT_FIELDS = [
     "body",
@@ -18,6 +24,11 @@ TEXT_FIELDS = [
     "legislationCited",
     "casesCited",
 ]
+
+RESULTS_RE = re.compile(r"Displaying \d+ - \d+ of (\d+)")
+PAGE_SIZE = 20
+
+PAUSE_SECONDS = 20
 
 
 class CaseLawException(Exception):
@@ -39,7 +50,10 @@ class Search:
         return self._search
 
     def build_query(self):
-        self._params = [(field, self._search.get(field, "")) for field in TEXT_FIELDS]
+        self._params = [("page", "")]  # initial query has no page
+        self._params.extend(
+            [(field, self._search.get(field, "")) for field in TEXT_FIELDS]
+        )
         self._params.extend(self.courts_query("courts", self._search["courts"]))
         self._params.extend(self.courts_query("tribunals", self._search["courts"]))
 
@@ -52,18 +66,36 @@ class Search:
         return params
 
     def results(self):
+        """
+        Pages through search results until we've finished, pausing for PAUSE_SECONDS
+        before the next request.
+        """
         self.build_query()
-        print(self._params)
+        _logger.info("Fetching page 1...")
         r = requests.get(CASELAW_SEARCH_URL, self._params)
         if r.status_code == 200:
-            results = self.scrape_results(r)
+            n_results, results = self.scrape_results(r)
             for result in results:
                 yield result
-        else:
-            raise CaseLawException(f"Bad status_code {r.status_code}")
-        # request next page, if appropriate, after a wait
+        n_pages = (n_results - 1) // PAGE_SIZE + 1
+        for page in range(1, n_pages):
+            time.sleep(PAUSE_SECONDS)
+            self._params[0] = ("page", str(page))
+            _logger.info(f"Fetching page {page + 1} of {n_pages}...")
+            r = requests.get(CASELAW_SEARCH_URL, self._params)
+            if r.status_code == 200:
+                n, results = self.scrape_results(r)
+                for result in results:
+                    yield result
+            else:
+                raise CaseLawException(f"Bad status_code {r.status_code}")
 
     def scrape_results(self, r: requests.Response) -> List[str]:
         soup = BeautifulSoup(r.text, "html.parser")
+        header_strings = list(soup.find("h1").stripped_strings)
+        m = RESULTS_RE.match(header_strings[1])
+        if not m:
+            raise CaseLawException("Couldn't get number of results from HTML")
+        results = int(m[1])
         decisions = [a for a in soup.find_all("a") if a["href"][:9] == "/decision"]
-        return decisions
+        return results, decisions
