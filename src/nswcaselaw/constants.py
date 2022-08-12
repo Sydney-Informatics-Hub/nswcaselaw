@@ -84,7 +84,7 @@ def fetch_courts() -> Dict[str, List[Tuple[str, str]]]:
     return None
 
 
-def court_id(court_type: str, court_idx: int) -> Tuple[str, str]:
+def index_to_court(court_type: str, court_idx: int) -> Tuple[str, str]:
     """
     Return the tuple for court or tribunal n, starting at 1
     """

@@ -3,7 +3,7 @@ import logging
 import sys
 
 from nswcaselaw import __version__
-from nswcaselaw.constants import COURTS, court_id
+from nswcaselaw.constants import COURTS
 from nswcaselaw.search import Search
 
 __author__ = "Mike Lynch"
@@ -125,8 +125,6 @@ def main(args):
         if not (args.courts or args.tribunals):
             _logger.error("You must select at least one court or tribunal")
         else:
-            courts = [court_id("courts", c)[0] for c in args.courts]
-            tribunals = [court_id("tribunals", c)[0] for c in args.tribunals]
             search = Search(
                 body=args.body,
                 title=args.title,
@@ -139,8 +137,8 @@ def main(args):
                 fileNumber=args.fileNumber,
                 legislationCited=args.legislationCited,
                 casesCited=args.casesCited,
-                courts=courts,
-                tribunals=tribunals,
+                courts=args.courts,
+                tribunals=args.tribunals,
             )
             for r in search.query():
                 print(r)

@@ -6,7 +6,7 @@ from typing import Generator, List, Tuple
 import requests
 from bs4 import BeautifulSoup
 
-from nswcaselaw.constants import CASELAW_SEARCH_URL, COURTS
+from nswcaselaw.constants import CASELAW_SEARCH_URL, COURTS, index_to_court
 
 _logger = logging.getLogger(__name__)
 
@@ -106,11 +106,13 @@ class Search:
 
     def __init__(self, **kwargs):
         self._query = {}
-        for field in TEXT_FIELDS:
-            self._query[field] = kwargs.get(field)
-        for field in COURTS_FIELDS:
+        for field in TEXT_FIELDS + COURTS_FIELDS:
             self._query[field] = kwargs.get(field)
         self._params = None
+
+    @property
+    def params(self):
+        return self._params
 
     def build_query(self):
         """
@@ -131,8 +133,12 @@ class Search:
         user has selected switched on.
         """
         params = []
+        if indices is not None:
+            ids = [index_to_court(court_type, idx)[0] for idx in indices]
+        else:
+            ids = []
         for court in COURTS[court_type]:
-            if court[0] in indices:
+            if court[0] in ids:
                 params.append((court_type, court[0]))
             params.append(("_" + court_type, "on"))
         return params
@@ -166,6 +172,8 @@ class Search:
     def scrape_results(self, html) -> List[str]:
         soup = BeautifulSoup(html, "html.parser")
         header_strings = list(soup.find("h1").stripped_strings)
+        if len(header_strings) < 2:
+            raise CaseLawException("Couldn't get results element from HTML")
         m = RESULTS_RE.match(header_strings[1])
         if not m:
             raise CaseLawException("Couldn't get number of results from HTML")
