@@ -1,14 +1,10 @@
 import argparse
-import json
 import logging
 import sys
-from typing import Dict, List
-
-import requests
-from bs4 import BeautifulSoup
 
 from nswcaselaw import __version__
-from nswcaselaw.constants import CASELAW_SEARCH_URL, COURTS, court_id
+from nswcaselaw.constants import COURTS, court_id
+from nswcaselaw.search import Search
 
 __author__ = "Mike Lynch"
 __copyright__ = "The University of Sydney"
@@ -17,40 +13,6 @@ __license__ = "MIT"
 _logger = logging.getLogger(__name__)
 
 # WAIT_TIME
-
-
-class CaseLawException(Exception):
-    pass
-
-
-class Search:
-    """
-    Class representing a CaseLaw query. Intialise it with a dictionary
-    of search parameters.
-    """
-
-    def __init__(self, search: Dict[str, str]):
-        self._search = search
-
-    @property
-    def search(self) -> Dict[str, str]:
-        return self._search
-
-    def results(self):
-        """yield results until we've finished"""
-        r = requests.get(CASELAW_SEARCH_URL, self._search)
-        if r.status_code == 200:
-            results = self.scrape_results(r)
-            for result in results:
-                yield result
-        else:
-            raise CaseLawException(f"Bad status_code {r.status_code}")
-            # request next page, if appropriate, after a wait
-
-    def scrape_results(self, r: requests.Response) -> List[str]:
-        soup = BeautifulSoup(r.text, "html.parser")
-        links = soup.find_all("a")
-        return links
 
 
 # ---- CLI ----
@@ -116,12 +78,14 @@ def parse_args(args):
         "--courts",
         type=int,
         nargs="+",
+        default=[],
         help="Select one or more by index number (see --list courts)",
     )
     parser.add_argument(
         "--tribunals",
         type=int,
         nargs="+",
+        default=[],
         help="Select one or more by index number (see --list tribunals)",
     )
     return parser.parse_args(args)
@@ -147,46 +111,8 @@ def list_courts(court_type: str):
         print(f"{index + 1:2d}. {name}")
 
 
-def args_to_query(args: argparse.Namespace) -> Dict[str, str]:
-    """
-    Build the query dictionary from the command-line args
-    """
-    query = {}
-    if args.body:
-        query["body"] = args.body
-    if args.title:
-        query["title"] = args.title
-    if args.before:
-        query["before"] = args.before
-    if args.catchwords:
-        query["catchwords"] = args.catchwords
-    if args.party:
-        query["party"] = args.party
-    if args.citation:
-        query["mnc"] = args.citation
-    if args.startDate:
-        query["startDate"] = args.startDate
-    if args.endDate:
-        query["endDate"] = args.endDate
-    if args.fileNumber:
-        query["fileNumber"] = args.fileNumber
-    if args.legislationCited:
-        query["legislationCited"] = args.legislationCited
-    if args.casesCited:
-        query["casesCited"] = args.casesCited
-    if args.courts:
-        query["courts"] = [court_id("courts", c)[0] for c in args.courts]
-    if args.tribunals:
-        query["tribunals"] = [court_id("tribunals", c)[0] for c in args.tribunals]
-    return query
-
-
 def main(args):
-    """Wrapper allowing :func:`fib` to be called with string arguments in a CLI fashion
-
-    Instead of returning the value from :func:`fib`, it prints the result to the
-    ``stdout`` in a nicely formatted message.
-
+    """
     Args:
       args (List[str]): command line parameters as list of strings
           (for example  ``["--verbose", "42"]``).
@@ -199,11 +125,25 @@ def main(args):
         if not (args.courts or args.tribunals):
             _logger.error("You must select at least one court or tribunal")
         else:
-            query = args_to_query(args)
-            print(json.dumps(query, indent=2))
-            # search = Search(query)
-            # for r in search.results():
-            #     print(r)
+            courts = [court_id("courts", c)[0] for c in args.courts]
+            tribunals = [court_id("tribunals", c)[0] for c in args.tribunals]
+            search = Search(
+                body=args.body,
+                title=args.title,
+                before=args.before,
+                catchwords=args.catchwords,
+                party=args.party,
+                mnc=args.citation,
+                startDate=args.startDate,
+                endDate=args.endDate,
+                fileNumber=args.fileNumber,
+                legislationCited=args.legislationCited,
+                casesCited=args.casesCited,
+                courts=courts,
+                tribunals=tribunals,
+            )
+            for r in search.query():
+                print(r)
 
 
 def run():

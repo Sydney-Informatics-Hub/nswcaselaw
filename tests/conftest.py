@@ -1,10 +1,13 @@
-"""
-    Dummy conftest.py for nswcaselaw.
+from pathlib import Path
 
-    If you don't know what this is for, just leave it empty.
-    Read more about conftest.py under:
-    - https://docs.pytest.org/en/stable/fixture.html
-    - https://docs.pytest.org/en/stable/writing_plugins.html
-"""
+import pytest
 
-# import pytest
+
+@pytest.fixture
+def search_fixtures():
+    fixtures_dir = Path("tests/fixtures")
+    return {
+        "html": fixtures_dir / "results.html",
+        "csv": fixtures_dir / "results.csv",
+        "n_results": 1284,
+    }
