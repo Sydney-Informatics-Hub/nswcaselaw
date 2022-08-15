@@ -1,9 +1,11 @@
 import argparse
 import logging
 import sys
+from pathlib import Path
 
 from nswcaselaw import __version__
 from nswcaselaw.constants import COURTS
+from nswcaselaw.decision import Decision
 from nswcaselaw.search import Search
 
 __author__ = "Mike Lynch"
@@ -59,13 +61,18 @@ def parse_args(args):
         choices=["courts", "tribunals"],
         help="Print a list of courts or tribunals",
     )
+    parser.add_argument(
+        "--dump", type=Path, default=None, help="Dir to dump HTML for debugging"
+    )
+    parser.add_argument(
+        "--test-parse",
+        type=Path,
+        default=None,
+        help="Test scraper on an HTML document and print results as JSON",
+    )
     parser.add_argument("--body", type=str, help="Full text search")
     parser.add_argument("--title", type=str, help="Case name")
-    parser.add_argument(
-        "--before",
-        type=str,
-        help="Judge, commissioner, magistrate, member, registrar or assessor",
-    )
+    parser.add_argument("--before", type=str)
     parser.add_argument("--catchwords", type=str)
     parser.add_argument("--party", type=str)
     parser.add_argument("--citation", type=str, help="Must include square brackets")
@@ -87,6 +94,12 @@ def parse_args(args):
         nargs="+",
         default=[],
         help="Select one or more by index number (see --list tribunals)",
+    )
+    parser.add_argument(
+        "--download",
+        default=False,
+        action="store_true",
+        help="Download and convert full judgments",
     )
     return parser.parse_args(args)
 
@@ -111,6 +124,43 @@ def list_courts(court_type: str):
         print(f"{index + 1:2d}. {name}")
 
 
+def test_scrape(test_file):
+    with open(test_file, "r") as fh:
+        html = fh.read()
+        d = Decision()
+        d.scrape(html)
+        print(d.json)
+
+
+def run_query(args: argparse.Namespace):
+    search = Search(
+        body=args.body,
+        title=args.title,
+        before=args.before,
+        catchwords=args.catchwords,
+        party=args.party,
+        mnc=args.citation,
+        startDate=args.startDate,
+        endDate=args.endDate,
+        fileNumber=args.fileNumber,
+        legislationCited=args.legislationCited,
+        casesCited=args.casesCited,
+        courts=args.courts,
+        tribunals=args.tribunals,
+    )
+    for r in search.query():
+        if args.download:
+            r.fetch()
+            if args.dump:
+                dumpto = (args.dump / r.id).with_suffix(".html")
+                with open(dumpto, "w") as fh:
+                    if r.html is not None:
+                        fh.write(r.html)
+                    else:
+                        fh.write("No content")
+        print(r.csv)
+
+
 def main(args):
     """
     Args:
@@ -119,29 +169,23 @@ def main(args):
     """
     args = parse_args(args)
     setup_logging(args.loglevel)
-    if args.list:
-        list_courts(args.list)
+    if args.test_parse:
+        test_scrape(args.test_parse)
     else:
-        if not (args.courts or args.tribunals):
-            _logger.error("You must select at least one court or tribunal")
+        if args.list:
+            list_courts(args.list)
         else:
-            search = Search(
-                body=args.body,
-                title=args.title,
-                before=args.before,
-                catchwords=args.catchwords,
-                party=args.party,
-                mnc=args.citation,
-                startDate=args.startDate,
-                endDate=args.endDate,
-                fileNumber=args.fileNumber,
-                legislationCited=args.legislationCited,
-                casesCited=args.casesCited,
-                courts=args.courts,
-                tribunals=args.tribunals,
-            )
-            for r in search.query():
-                print(r)
+            if not (args.courts or args.tribunals):
+                _logger.error(
+                    """
+You must select at least one court or tribunal.
+
+Use the --list courts or --list tribunals options for a list of available
+options.
+"""
+                )
+            else:
+                run_query(args)
 
 
 def run():
