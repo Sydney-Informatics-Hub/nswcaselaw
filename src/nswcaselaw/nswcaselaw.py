@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -129,7 +130,9 @@ def test_scrape(test_file):
         html = fh.read()
         d = Decision()
         d.scrape(html)
-        print(d.json)
+        values = d.dict
+        values.pop("judgment")
+        print(json.dumps(values, indent=2))
 
 
 def run_query(args: argparse.Namespace):

@@ -1,4 +1,3 @@
-import json
 import time
 
 import requests
@@ -126,7 +125,7 @@ class Decision:
         return self._csv
 
     @property
-    def json(self):
+    def dict(self):
         if self._dict is None:
             self._dict = {
                 "title": self._title,
@@ -148,8 +147,7 @@ class Decision:
                 "representation": self._representation,
                 "judgment": self._judgment,
             }
-            self._json = json.dumps(self._dict, indent=2)
-        return self._json
+        return self._dict
 
     def fetch(self):
         """
@@ -203,7 +201,7 @@ class Decision:
         self._representation = self._values.get("Representation:")
         judgment = soup.find("div", _class="body")
         if judgment:
-            self._judgment = judgment
+            self._judgment = str(judgment)  # leaving as HTML for now
         return True
 
     def _old_style_scrape(self, soup):
@@ -219,7 +217,7 @@ class Decision:
                 j = self._looks_like_judgment(cells)
                 if j:
                     self._judgment = j
-        self._mnc = self._values.get("Medium Neutral Citation:")
+        self._mnc = self._values.get("CITATION :")
         self._hearingDates = self._values.get("HEARING DATE(S) :")
         self._dateOfOrders = self._values.get("Date of orders:")
         self._decisionDate = self._values.get("JUDGMENT DATE :")
@@ -237,6 +235,7 @@ class Decision:
             self._representation = counsel
         if solicitors is not None:
             self._representation += solicitors
+        # fixme: the judgment!!
         return True
 
     def _looks_like_judgment(self, cells):
