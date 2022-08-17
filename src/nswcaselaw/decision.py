@@ -224,18 +224,29 @@ class Decision:
         self._decisionDate = self._find_value("Decision date")
         self._jurisdiction = self._find_value("Jurisdiction")
         self._before = self._find_value("Before")
-        self._decision = self._find_value("Decision")
-        self._catchwords = self._find_value("Catchwords")
-        self._legislationCited = self._find_value("Legislation Cited")
-        self._casesCited = self._find_value("Cases Cited")
-        self._parties = self._find_value("Parties")
+        # Decision matches with a ":" to disambiguate from "Decision date"
+        self._decision = self._find_value("Decision:")[0]
+        self._catchwords = self._new_catchwords(self._find_value("Catchwords"))
+        self._legislationCited = self._fix_whitespace(
+            self._find_value("Legislation Cited")
+        )
+        self._casesCited = self._fix_whitespace(self._find_value("Cases Cited"))
+        self._parties = self._find_value("Parties").split("\n")
         self._category = self._find_value("Category")
         self._fileNumber = self._find_value("File Number")
-        self._representation = self._find_value("Representation")
+        self._representation = self._find_value("Representation").split("\n")
         judgment = soup.find("div", _class="body")
         if judgment:
             self._judgment = str(judgment)  # leaving as HTML for now
         return True
+
+    def _fix_whitespace(self, values):
+        return [v.replace("\n", " ") for v in values]
+
+    def _new_catchwords(self, catchwords):
+        if catchwords is None or not catchwords:
+            return []
+        return [cw.strip() for cw in catchwords[0].split("\u2014")]
 
     def _old_style_scrape(self, soup):
         rows = soup.find_all("tr")

@@ -7,7 +7,7 @@ from nswcaselaw.nswcaselaw import Decision
 _logger = logging.getLogger(__name__)
 
 
-@pytest.mark.parametrize("style", ["old"])
+@pytest.mark.parametrize("style", ["new", "old"])
 def test_decision_scrape(scrape_fixtures, style):
     d = Decision()
     with open(scrape_fixtures[style], "r") as fh:
