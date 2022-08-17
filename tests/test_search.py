@@ -8,7 +8,7 @@ from nswcaselaw.nswcaselaw import Search
 _logger = logging.getLogger(__name__)
 
 
-def test_decision_scrape(search_fixtures):
+def test_results_scrape(search_fixtures):
     """Tests web parsing without actually hitting Caselaw"""
     s = Search()
     with open(search_fixtures["html"], "r") as fh:
