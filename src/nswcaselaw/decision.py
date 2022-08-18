@@ -147,7 +147,8 @@ class Decision:
     @property
     def csv(self):
         if self._csv is None:
-            self._csv = ",".join([f'"{p}"' for p in CSV_FIELDS])
+            values = [self._values.get(p, "") for p in CSV_FIELDS]
+            self._csv = ",".join([f'"{v}"' for v in values])
             self._csv = self._csv.replace("\n", " ")
         return self._csv
 

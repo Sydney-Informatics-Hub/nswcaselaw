@@ -98,9 +98,9 @@ def parse_args(args):
     )
     parser.add_argument(
         "--download",
-        default=False,
-        action="store_true",
-        help="Download and convert full judgments",
+        type=Path,
+        default=None,
+        help="Download full judgments and write JSON to this directory",
     )
     return parser.parse_args(args)
 
@@ -149,17 +149,20 @@ def run_query(args: argparse.Namespace):
         courts=args.courts,
         tribunals=args.tribunals,
     )
-    for r in search.query():
+    for decision in search.query():
         if args.download:
-            r.fetch()
+            decision.fetch()
             if args.dump:
-                dumpto = (args.dump / r.id).with_suffix(".html")
-                with open(dumpto, "w") as fh:
-                    if r.html is not None:
-                        fh.write(r.html)
+                htmlfile = (args.dump / decision.id).with_suffix(".html")
+                with open(htmlfile, "w") as fh:
+                    if decision.html is not None:
+                        fh.write(decision.html)
                     else:
                         fh.write("No content")
-        print(r.csv)
+            jsonfile = (args.download / decision.id).with_suffix(".json")
+            with open(jsonfile, "w") as fh:
+                fh.write(json.dumps(decision.values, indent=2))
+        print(decision.csv)
 
 
 def main(args):
