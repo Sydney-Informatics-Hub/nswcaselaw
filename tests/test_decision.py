@@ -14,6 +14,4 @@ def test_decision_scrape(scrape_fixtures, style):
         html = fh.read()
         result = d.scrape(html)
         assert result
-        values = d.values
-        values.pop("judgment")
         assert d.values == scrape_fixtures["metadata"]

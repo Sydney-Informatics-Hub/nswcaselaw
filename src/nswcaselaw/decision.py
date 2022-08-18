@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 
 import requests
@@ -276,17 +277,36 @@ class NewScScraper(Scraper):
             self._values[f] = self._fix_whitespace(self._values[f])
         self._values["parties"] = self._values["parties"].split("\n")
         self._values["representation"] = self._values["representation"].split("\n")
-        judgment = self._soup.find("div", _class="body")
-        if judgment:
-            self._values["judgment"] = str(judgment)  # leaving as HTML for now
-        else:
-            self._values["judgment"] = ""
+        self._values["judgment"] = self._scrape_judgment()
         return self._values
 
     def _catchwords(self, catchwords):
         if catchwords is None or not catchwords:
             return []
         return [cw.strip() for cw in catchwords[0].split("\u2014")]
+
+    def _scrape_judgment(self):
+        body = self._soup.find("div", {"class": "body"})
+        if not body:
+            self._warning("Couldn't find <div> with judgment")
+            return []
+        paragraphs = []
+        stars = re.compile(r"\*+")
+        for child in body.children:
+            if child.name == "h2":
+                paragraphs.append("##" + self._strings(child))
+            elif child.name == "ol":
+                n = int(child["start"])
+                for li in child.find_all("li"):
+                    paragraphs.append(str(n) + " " + self._strings(li))
+                    n += 1
+            elif child.name == "p":
+                pclass = child["class"]
+                ptext = self._strings(child)
+                if not ("disclaimer" in pclass or "lastupdate" in pclass):
+                    if not stars.match(ptext):
+                        paragraphs.append("> " + ptext)
+        return paragraphs
 
 
 class OldScScraper(Scraper):
@@ -318,10 +338,6 @@ class OldScScraper(Scraper):
             if len(cells) >= 3:
                 header = self._strings(cells[1])
                 self._raw[header] = self._strings(cells[2])
-            else:
-                j = self._looks_like_judgment(cells)
-                if j:
-                    self._values["judgment"] = j
 
         for field, pattern in self.PATTERNS.items():
             self._values[field] = self._find_value(pattern)
@@ -334,7 +350,7 @@ class OldScScraper(Scraper):
             self._values["representation"] = []
         if self._values["solicitors"] is not None:
             self._values["representation"] += self._values.pop("solicitors")
-        # fixme: the judgment!!
+        self._values["judgment"] = self._scrape_judgment()
         return self._values
 
     def _catchwords(self, catchwords):
@@ -342,7 +358,24 @@ class OldScScraper(Scraper):
             return []
         return [cw.strip() for cw in catchwords.split("-")]
 
-    def _looks_like_judgment(self, cells):
-        if len(cells) != 2:
-            return None
-        return cells[1]  # this is pretty dumb, assume a judgment table is 2
+    def _scrape_judgment(self):
+        paragraphs = []
+        for tr in self._soup.find_all("tr"):
+            for td in tr.find_all("td"):
+                uls = td.find_all("ul")
+                if uls:
+                    for child in td.children:
+                        if child.name == "ul":
+                            # some uls contain text: these are indented passages
+                            ul_content = "\n".join(child.stripped_strings).strip()
+                            if ul_content and paragraphs:
+                                paragraphs[-1].append(ul_content)
+                            paragraphs.append([])
+                        else:
+                            if paragraphs:
+                                section = child.text
+                                if section.strip():
+                                    paragraphs[-1].append(section)
+        paragraphs = [" ".join(p) for p in paragraphs]
+        paragraphs = [p for p in paragraphs if p.strip()]
+        return paragraphs

@@ -126,13 +126,11 @@ def list_courts(court_type: str):
 
 
 def test_scrape(test_file):
-    with open(test_file, "r") as fh:
-        html = fh.read()
-        d = Decision()
-        d.scrape(html)
-        values = d.dict
-        values.pop("judgment")
-        print(json.dumps(values, indent=2))
+    d = Decision()
+    if d.load_file(test_file):
+        print(json.dumps(d.values, indent=2))
+    else:
+        print(f"scrape of {test_file} failed")
 
 
 def run_query(args: argparse.Namespace):

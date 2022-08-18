@@ -50,5 +50,10 @@ def scrape_fixtures():
                 "Law Firm 1 (Plaintiff)",
                 "Law Firm 2 (Defendant)",
             ],
+            "judgment": [
+                "1 Paragraph 1 of judgment",
+                "2 Paragraph 2 of judgment",
+                "3 Paragraph 3 of judgment",
+            ],
         },
     }
