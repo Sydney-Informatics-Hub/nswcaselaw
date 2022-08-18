@@ -12,9 +12,8 @@ def test_decision_scrape(scrape_fixtures, style):
     d = Decision()
     with open(scrape_fixtures[style], "r") as fh:
         html = fh.read()
-        d.scrape(html)
-        values = d.dict
+        result = d.scrape(html)
+        assert result
+        values = d.values
         values.pop("judgment")
-        values.pop("date")
-        values.pop("uri")
-        assert d.dict == scrape_fixtures["metadata"]
+        assert d.values == scrape_fixtures["metadata"]

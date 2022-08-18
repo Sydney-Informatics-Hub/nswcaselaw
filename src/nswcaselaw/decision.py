@@ -10,6 +10,26 @@ FETCH_PAUSE_SECONDS = 5
 
 _logger = logging.getLogger(__name__)
 
+CSV_FIELDS = [
+    "title",
+    "uri",
+    "date",
+    "mnc",
+    "before",
+    "catchwords",
+    "hearingDates",
+    "dateOfOrders",
+    "decisionDate",
+    "jurisdiction",
+    "decision",
+    "legislationCited",
+    "casesCited",
+    "parties",
+    "category",
+    "fileNumber",
+    "representation",
+]
+
 
 class Decision:
     """
@@ -26,21 +46,7 @@ class Decision:
         self._date = kwargs.get("date")
         self._catchwords = kwargs.get("catchwords")
         self._uri = kwargs.get("uri")
-        self._mnc = ""
-        self._hearingDates = ""
-        self._dateOfOrders = ""
-        self._decisionDate = ""
-        self._jurisdiction = ""
-        self._decision = ""
-        self._legislationCited = ""
-        self._casesCited = ""
-        self._parties = ""
-        self._category = ""
-        self._fileNumber = ""
-        self._representation = ""
-        self._judgment = ""
         self._csv = None
-        self._dict = None
 
     def __repr__(self):
         """
@@ -62,23 +68,67 @@ class Decision:
 
     @property
     def title(self):
-        return self._title
+        return self._values.ger("title")
 
     @property
     def before(self):
-        return self._before
+        return self._values.get("before")
 
     @property
     def date(self):
-        return self._date
+        return self._values.get("date")
 
     @property
     def catchwords(self):
-        return self._catchwords
+        return self._values.get("catchwords")
 
     @property
     def link(self):
         return self._uri
+
+    @property
+    def hearingDates(self):
+        return self._values.get("hearingDates")
+
+    @property
+    def dateOfOrders(self):
+        return self._values.get("dateOfOrders")
+
+    @property
+    def decisionDate(self):
+        return self._values.get("decisionDate")
+
+    @property
+    def jurisdiction(self):
+        return self._values.get("jurisdiction")
+
+    @property
+    def decision(self):
+        return self._values.get("decision")
+
+    @property
+    def legislationCited(self):
+        return self._values.get("legislationCited")
+
+    @property
+    def casesCited(self):
+        return self._values.get("casesCited")
+
+    @property
+    def parties(self):
+        return self._values.get("parties")
+
+    @property
+    def category(self):
+        return self._values.get("category")
+
+    @property
+    def fileNumber(self):
+        return self._values.get("fileNumber")
+
+    @property
+    def representation(self):
+        return self._values.get("representation")
 
     @property
     def id(self):
@@ -94,63 +144,11 @@ class Decision:
         return self._values
 
     @property
-    def html(self):
-        return self._html
-
-    @property
     def csv(self):
         if self._csv is None:
-            self._csv = ",".join(
-                [
-                    f'"{p}"'
-                    for p in [
-                        self._title,
-                        self._uri,
-                        self._date,
-                        self._mnc,
-                        self._before,
-                        self._catchwords,
-                        self._hearingDates,
-                        self._dateOfOrders,
-                        self._decisionDate,
-                        self._jurisdiction,
-                        self._decision,
-                        self._legislationCited,
-                        self._casesCited,
-                        self._parties,
-                        self._category,
-                        self._fileNumber,
-                        self._representation,
-                    ]
-                ]
-            )
+            self._csv = ",".join([f'"{p}"' for p in CSV_FIELDS])
             self._csv = self._csv.replace("\n", " ")
         return self._csv
-
-    @property
-    def dict(self):
-        if self._dict is None:
-            self._dict = {
-                "title": self._title,
-                "uri": self._uri,
-                "date": self._date,
-                "mnc": self._mnc,
-                "before": self._before,
-                "catchwords": self._catchwords,
-                "hearingDates": self._hearingDates,
-                "dateOfOrders": self._dateOfOrders,
-                "decisionDate": self._decisionDate,
-                "jurisdiction": self._jurisdiction,
-                "decision": self._decision,
-                "legislationCited": self._legislationCited,
-                "casesCited": self._casesCited,
-                "parties": self._parties,
-                "category": self._category,
-                "fileNumber": self._fileNumber,
-                "representation": self._representation,
-                "judgment": self._judgment,
-            }
-        return self._dict
 
     def fetch(self):
         """
@@ -162,17 +160,10 @@ class Decision:
             self.scrape(self._html)
         time.sleep(FETCH_PAUSE_SECONDS)
 
-    def elt_text(self, elt):
-        return "\n".join(elt.stripped_strings)
-
-    def _find_value(self, pattern):
-        matches = [f for f in self._values.keys() if pattern in f]
-        if not matches:
-            self._warning(f"{pattern} not found")
-            return ""
-        if len(matches) > 1:
-            self._warning(f"Multiple matchs for {pattern}")
-        return self._values[matches[0]]
+    def load_file(self, test_file):
+        with open(test_file, "r") as fh:
+            html = fh.read()
+            return self.scrape(html)
 
     def _warning(self, message):
         """
@@ -180,110 +171,173 @@ class Decision:
         """
         _logger.warning(f"[{self._uri} {self._title}] {message}")
 
-    # NOTE I have only done these for Supreme Court judgments. Are there other
-    # formats?
-    # TODO: these should be Classes
-
     def scrape(self, html):
-        soup = BeautifulSoup(html, "html.parser")
-        if self._title is None:
-            self._scrape_title(soup)
+        self._soup = BeautifulSoup(html, "html.parser")
         try:
-            if self._new_style_scrape(soup):
-                return True
-            if self._old_style_scrape(soup):
-                return True
+            scraper = self._get_scraper()
+            self._values = scraper.scrape()
+            return True
         except Exception as e:
             self._warning(f"Scrape failed: {e}")
             return False
 
-    def _scrape_title(self, soup):
-        title = soup.find("title")
-        if title:
-            title_text = " ".join(title.stripped_strings)
-            title_text = title_text.split("-")[0]
-            self._title = title_text.strip()
-        else:
-            self._warning("No title tag")
-
-    def _new_style_scrape(self, soup):
-        dts = soup.find_all("dt")
+    def _get_scraper(self):
+        """
+        Determing which scraper to use, based on the soup. This should maybe
+        be part of the Scraper class?
+        """
+        dts = self._soup.find_all("dt")
         if not dts:
-            return False
-        for dt in dts:
-            dd = dt.find_next_sibling("dd")
-            field = dt.string
-            paras = dd.find_all("p")
-            if paras:
-                self._values[field] = [self.elt_text(p) for p in paras]
-            else:
-                self._values[field] = self.elt_text(dd)
-        self._mnc = self._find_value("Medium Neutral Citation")
-        self._hearingDates = self._find_value("Hearing dates")
-        self._dateOfOrders = self._find_value("Date of orders")
-        self._decisionDate = self._find_value("Decision date")
-        self._jurisdiction = self._find_value("Jurisdiction")
-        self._before = self._find_value("Before")
-        # Decision matches with a ":" to disambiguate from "Decision date"
-        self._decision = self._find_value("Decision:")[0]
-        self._catchwords = self._new_catchwords(self._find_value("Catchwords"))
-        self._legislationCited = self._fix_whitespace(
-            self._find_value("Legislation Cited")
-        )
-        self._casesCited = self._fix_whitespace(self._find_value("Cases Cited"))
-        self._parties = self._find_value("Parties").split("\n")
-        self._category = self._find_value("Category")
-        self._fileNumber = self._find_value("File Number")
-        self._representation = self._find_value("Representation").split("\n")
-        judgment = soup.find("div", _class="body")
-        if judgment:
-            self._judgment = str(judgment)  # leaving as HTML for now
-        return True
+            return OldScScraper(self)
+        else:
+            return NewScScraper(self)
+
+
+class Scraper:
+    """
+    Superclass for scrapers - each scraper deals with a different HTML
+    format from CaseLaw.
+    """
+
+    def __init__(self, decision):
+        self._decision = decision
+        self._soup = decision._soup
+        self._raw = {}
+        self._values = {}
+
+    def _warning(self, message):
+        self._decision._warning(message)
+
+    def scrape(self):
+        data = self._scrape_metadata()
+        data["title"] = self._scrape_title()
+        return data
+
+    def _strings(self, elt):
+        return "\n".join(elt.stripped_strings)
 
     def _fix_whitespace(self, values):
         return [v.replace("\n", " ") for v in values]
 
-    def _new_catchwords(self, catchwords):
+    def _find_value(self, pattern):
+        matches = [f for f in self._raw.keys() if pattern in f]
+        if not matches:
+            self._warning(f"{pattern} not found")
+            return ""
+        if len(matches) > 1:
+            self._warning(f"Multiple matches for {pattern}")
+        return self._raw[matches[0]]
+
+    def _scrape_title(self):
+        title = self._soup.find("title")
+        if title:
+            title_text = " ".join(title.stripped_strings)
+            title_text = title_text.split("-")[0]
+            return title_text.strip()
+        else:
+            self._warning("No title tag")
+
+
+class NewScScraper(Scraper):
+
+    PATTERNS = {
+        "mnc": "Medium Neutral Citation",
+        "hearingDates": "Hearing dates",
+        "dateOfOrders": "Date of orders",
+        "decisionDate": "Decision date",
+        "jurisdiction": "Jurisdiction",
+        "before": "Before",
+        "decision": "Decision:",
+        "catchwords": "Catchwords",
+        "legislationCited": "Legislation Cited",
+        "casesCited": "Cases Cited",
+        "parties": "Parties",
+        "category": "Category",
+        "fileNumber": "File Number",
+        "representation": "Representation",
+    }
+
+    def _scrape_metadata(self):
+        for dt in self._soup.find_all("dt"):
+            dd = dt.find_next_sibling("dd")
+            header = dt.string
+            paras = dd.find_all("p")
+            if paras:
+                self._raw[header] = [self._strings(p) for p in paras]
+            else:
+                self._raw[header] = self._strings(dd)
+
+        for field, pattern in self.PATTERNS.items():
+            self._values[field] = self._find_value(pattern)
+
+        self._values["decision"] = self._values["decision"][0]
+        self._values["catchwords"] = self._catchwords(self._values["catchwords"])
+        for f in ["legislationCited", "casesCited"]:
+            self._values[f] = self._fix_whitespace(self._values[f])
+        self._values["parties"] = self._values["parties"].split("\n")
+        self._values["representation"] = self._values["representation"].split("\n")
+        judgment = self._soup.find("div", _class="body")
+        if judgment:
+            self._values["judgment"] = str(judgment)  # leaving as HTML for now
+        else:
+            self._values["judgment"] = ""
+        return self._values
+
+    def _catchwords(self, catchwords):
         if catchwords is None or not catchwords:
             return []
         return [cw.strip() for cw in catchwords[0].split("\u2014")]
 
-    def _old_style_scrape(self, soup):
-        rows = soup.find_all("tr")
+
+class OldScScraper(Scraper):
+
+    PATTERNS = {
+        "mnc": "CITATION",
+        "hearingDates": "HEARING DATE",
+        "dateOfOrders": "DATE OF ORDERS",
+        "decisionDate": "JUDGMENT DATE",
+        "jurisdiction": "JURISDICTION",
+        "before": "JUDGMENT OF",
+        "decision": "DECISION",
+        "catchwords": "CATCHWORDS",
+        "legislationCited": "LEGISLATION CITED",
+        "casesCited": "CASES CITED",
+        "parties": "PARTIES",
+        "category": "CATEGORY",
+        "fileNumber": "FILE NUMBER",
+        "counsel": "COUNSEL",
+        "solicitors": "SOLICITORS",
+    }
+
+    def _scrape_metadata(self):
+        rows = self._soup.find_all("tr")
         if not rows:
-            return False
+            return {}
         for row in rows:
             cells = row.find_all("td")
             if len(cells) >= 3:
-                field = self.elt_text(cells[1])
-                self._values[field] = self.elt_text(cells[2])
+                header = self._strings(cells[1])
+                self._raw[header] = self._strings(cells[2])
             else:
                 j = self._looks_like_judgment(cells)
                 if j:
-                    self._judgment = j
-        self._mnc = self._find_value("CITATION")
-        self._hearingDates = self._find_value("HEARING DATE")
-        self._dateOfOrders = self._find_value("DATE OF ORDERS")
-        self._decisionDate = self._find_value("JUDGMENT DATE")
-        self._jurisdiction = self._find_value("JURISDICTION")
-        self._category = self._find_value("CATEGORY")
-        self._before = self._find_value("JUDGMENT OF")
-        self._decision = self._find_value("DECISION")
-        self._catchwords = self._old_catchwords(self._find_value("CATCHWORDS"))
-        self._legislationCited = self._find_value("LEGISLATION CITED").split("\n")
-        self._casesCited = self._find_value("CASES CITED").split("\n")
-        self._parties = self._find_value("PARTIES").split("\n")
-        self._fileNumber = self._find_value("FILE NUMBER")
-        counsel = self._find_value("COUNSEL").split("\n")
-        solicitors = self._find_value("SOLICITORS").split("\n")
-        if counsel is not None:
-            self._representation = counsel
-        if solicitors is not None:
-            self._representation += solicitors
-        # fixme: the judgment!!
-        return True
+                    self._values["judgment"] = j
 
-    def _old_catchwords(self, catchwords):
+        for field, pattern in self.PATTERNS.items():
+            self._values[field] = self._find_value(pattern)
+        self._values["catchwords"] = self._catchwords(self._values["catchwords"])
+        for f in ["legislationCited", "casesCited", "parties", "counsel", "solicitors"]:
+            self._values[f] = self._values[f].split("\n")
+        if self._values["counsel"] is not None:
+            self._values["representation"] = self._values.pop("counsel")
+        else:
+            self._values["representation"] = []
+        if self._values["solicitors"] is not None:
+            self._values["representation"] += self._values.pop("solicitors")
+        # fixme: the judgment!!
+        return self._values
+
+    def _catchwords(self, catchwords):
         if catchwords is None:
             return []
         return [cw.strip() for cw in catchwords.split("-")]
