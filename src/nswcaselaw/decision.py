@@ -11,6 +11,14 @@ FETCH_PAUSE_SECONDS = 5
 
 _logger = logging.getLogger(__name__)
 
+BASE_FIELDS = [
+    "title",
+    "before",
+    "date",
+    "catchwords",
+    "uri",
+]
+
 CSV_FIELDS = [
     "title",
     "uri",
@@ -42,34 +50,13 @@ class Decision:
 
     def __init__(self, **kwargs):
         self._values = {}
-        self._title = kwargs.get("title")
-        self._before = kwargs.get("before")
-        self._date = kwargs.get("date")
-        self._catchwords = kwargs.get("catchwords")
-        self._uri = kwargs.get("uri")
+        for field in BASE_FIELDS:
+            self._values[field] = kwargs.get(field)
         self._csv = None
-
-    def __repr__(self):
-        """
-        Returns the decision fields which are available from the search
-        results page as a comma-separated list in quotes.
-        """
-        return ",".join(
-            [
-                f'"{p}"'
-                for p in [
-                    self._title,
-                    self._uri,
-                    self._date,
-                    self._before,
-                    self._catchwords,
-                ]
-            ]
-        )
 
     @property
     def title(self):
-        return self._values.ger("title")
+        return self._values.get("title")
 
     @property
     def before(self):
@@ -84,8 +71,8 @@ class Decision:
         return self._values.get("catchwords")
 
     @property
-    def link(self):
-        return self._uri
+    def uri(self):
+        return self._values.get("uri")
 
     @property
     def hearingDates(self):
@@ -132,10 +119,14 @@ class Decision:
         return self._values.get("representation")
 
     @property
+    def judgment(self):
+        return self._values.get("judgment")
+
+    @property
     def id(self):
         """The unique identifier in the decision URI"""
-        if self._uri:
-            parts = self._uri.split("/")
+        if self.uri:
+            parts = self.uri.split("/")
             return parts[-1]
         else:
             return None
@@ -143,6 +134,24 @@ class Decision:
     @property
     def values(self):
         return self._values
+
+    def __repr__(self):
+        """
+        Returns the decision fields which are available from the search
+        results page as a comma-separated list in quotes.
+        """
+        return ",".join(
+            [
+                f'"{p}"'
+                for p in [
+                    self.title,
+                    self.uri,
+                    self.date,
+                    self.before,
+                    self.catchwords,
+                ]
+            ]
+        )
 
     @property
     def csv(self):
@@ -164,7 +173,7 @@ class Decision:
         """
         Load and scrape the body of this decision
         """
-        r = requests.get(CASELAW_BASE_URL + self._uri)
+        r = requests.get(CASELAW_BASE_URL + self.uri)
         if r.status_code == 200:
             self._html = r.text
             self.scrape(self._html)
@@ -179,7 +188,7 @@ class Decision:
         """
         Emits a warning with this decisions URI and title prepended
         """
-        _logger.warning(f"[{self._uri} {self._title}] {message}")
+        _logger.warning(f"[{self.uri} {self.title}] {message}")
 
     def scrape(self, html):
         self._soup = BeautifulSoup(html, "html.parser")

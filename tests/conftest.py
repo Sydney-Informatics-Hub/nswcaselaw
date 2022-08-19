@@ -19,6 +19,20 @@ def scrape_fixtures():
     return {
         "old": fixtures_dir / "scrape_old.html",
         "new": fixtures_dir / "scrape_new.html",
+        "basic_metadata": {
+            "title": "Jarndyce v Jarndyce",
+            "before": "Xasiuisf J",
+            "catchwords": [
+                "NONSENSE",
+                "fake catchwords",
+                "blague",
+                "ballyhoo",
+                "MORE STUFF",
+                "and nonsense",
+            ],
+            "uri": "/decision/deadbeefdeadbeefdeadbeefdeadbeef",
+            "date": "10/10/1979",
+        },
         "metadata": {
             "title": "Jarndyce v Jarndyce",
             "mnc": "Jarndyce v Jarndyce [1979] King's Bench 20232",
