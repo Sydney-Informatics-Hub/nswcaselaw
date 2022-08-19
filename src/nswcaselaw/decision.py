@@ -146,11 +146,19 @@ class Decision:
 
     @property
     def csv(self):
+        """TODO: use a csv library for this"""
         if self._csv is None:
-            values = [self._values.get(p, "") for p in CSV_FIELDS]
+            values = [self._csv_value(p) for p in CSV_FIELDS]
             self._csv = ",".join([f'"{v}"' for v in values])
             self._csv = self._csv.replace("\n", " ")
         return self._csv
+
+    def _csv_value(self, field):
+        v = self._values.get(field, "")
+        if type(v) == list:
+            v = "; ".join(v)
+        v = v.replace('"', "'")
+        return v
 
     def fetch(self):
         """
@@ -175,13 +183,13 @@ class Decision:
 
     def scrape(self, html):
         self._soup = BeautifulSoup(html, "html.parser")
-        try:
-            scraper = self._get_scraper()
-            self._values = scraper.scrape()
-            return True
-        except Exception as e:
-            self._warning(f"Scrape failed: {e}")
-            return False
+        scraper = self._get_scraper()
+        self._warning(f"Scraping with {scraper}")
+        self._values = scraper.scrape()
+        return True
+        # except Exception as e:
+        #     self._warning(f"Scrape failed: {e}")
+        #     return False
 
     def _get_scraper(self):
         """
@@ -272,19 +280,32 @@ class NewScScraper(Scraper):
         for field, pattern in self.PATTERNS.items():
             self._values[field] = self._find_value(pattern)
 
+        # some new-style decisions don't wrap catchwords, legslation or
+        # cases in <p> tags - split these on newlines
+
+        for f in ["catchwords", "legislationCited", "casesCited"]:
+            self._values[f] = self._ensure_list(self._values[f])
+
         self._values["decision"] = self._values["decision"][0]
         self._values["catchwords"] = self._catchwords(self._values["catchwords"])
         for f in ["legislationCited", "casesCited"]:
             self._values[f] = self._fix_whitespace(self._values[f])
+
         self._values["parties"] = self._values["parties"].split("\n")
         self._values["representation"] = self._values["representation"].split("\n")
         self._values["judgment"] = self._scrape_judgment()
         return self._values
 
+    def _ensure_list(self, value):
+        if type(value) == list:
+            return value
+        else:
+            return value.split("\n")
+
     def _catchwords(self, catchwords):
         if catchwords is None or not catchwords:
             return []
-        return [cw.strip() for cw in catchwords[0].split("\u2014")]
+        return [cw.strip() for cw in re.split("[\u2014-]", catchwords[0])]
 
     def _scrape_judgment(self):
         body = self._soup.find("div", {"class": "body"})
@@ -292,7 +313,6 @@ class NewScScraper(Scraper):
             self._warning("Couldn't find <div> with judgment")
             return []
         paragraphs = []
-        stars = re.compile(r"\*+")
         for child in body.children:
             if child.name == "h2":
                 paragraphs.append("##" + self._strings(child))
@@ -302,12 +322,21 @@ class NewScScraper(Scraper):
                     paragraphs.append(str(n) + " " + self._strings(li))
                     n += 1
             elif child.name == "p":
-                pclass = child["class"]
-                ptext = self._strings(child)
-                if not ("disclaimer" in pclass or "lastupdate" in pclass):
-                    if not stars.match(ptext):
-                        paragraphs.append("> " + ptext)
+                if not self._ignored_paras(child):
+                    text = self._strings(child)
+                    if text:
+                        paragraphs.append(text)
         return paragraphs
+
+    def _ignored_paras(self, p):
+        """check for old-style judgment paragraphs which we want to ignore"""
+        if "class" in p.attrs:
+            if "disclaimer" in p["class"] or "lastupdate" in p["class"]:
+                return True
+        stars = re.compile(r"\*+")
+        if stars.match(self._strings(p)):
+            return True
+        return False
 
 
 class OldScScraper(Scraper):

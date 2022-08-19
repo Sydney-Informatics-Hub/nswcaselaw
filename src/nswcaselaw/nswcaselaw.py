@@ -6,7 +6,7 @@ from pathlib import Path
 
 from nswcaselaw import __version__
 from nswcaselaw.constants import COURTS
-from nswcaselaw.decision import Decision
+from nswcaselaw.decision import CSV_FIELDS, Decision
 from nswcaselaw.search import Search
 
 __author__ = "Mike Lynch"
@@ -102,6 +102,7 @@ def parse_args(args):
         default=None,
         help="Download full judgments and write JSON to this directory",
     )
+    parser.add_argument("--limit", type=int, default=None, help="Max results")
     return parser.parse_args(args)
 
 
@@ -113,7 +114,7 @@ def setup_logging(loglevel):
     """
     logformat = "[%(asctime)s] %(levelname)s:%(name)s:%(message)s"
     logging.basicConfig(
-        level=loglevel, stream=sys.stdout, format=logformat, datefmt="%Y-%m-%d %H:%M:%S"
+        level=loglevel, stream=sys.stderr, format=logformat, datefmt="%Y-%m-%d %H:%M:%S"
     )
 
 
@@ -149,6 +150,8 @@ def run_query(args: argparse.Namespace):
         courts=args.courts,
         tribunals=args.tribunals,
     )
+    n = 0
+    print(",".join([f'"{f}"' for f in CSV_FIELDS]))
     for decision in search.query():
         if args.download:
             decision.fetch()
@@ -163,6 +166,9 @@ def run_query(args: argparse.Namespace):
             with open(jsonfile, "w") as fh:
                 fh.write(json.dumps(decision.values, indent=2))
         print(decision.csv)
+        n += 1
+        if args.limit and n > args.limit:
+            return
 
 
 def main(args):
