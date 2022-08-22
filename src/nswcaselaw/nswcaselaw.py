@@ -6,7 +6,7 @@ from pathlib import Path
 
 from nswcaselaw import __version__
 from nswcaselaw.constants import COURTS
-from nswcaselaw.decision import CSV_FIELDS, Decision
+from nswcaselaw.decision import CSV_FIELDS, SCRAPER_WARNING, Decision
 from nswcaselaw.search import Search
 
 __author__ = "Mike Lynch"
@@ -124,6 +124,7 @@ def list_courts(court_type: str):
     """
     for index, (_, name) in enumerate(COURTS[court_type]):
         print(f"{index + 1:2d}. {name}")
+    print(SCRAPER_WARNING)
 
 
 def test_scrape(test_file):
@@ -153,6 +154,7 @@ def run_query(args: argparse.Namespace):
     n = 0
     print(",".join([f'"{f}"' for f in CSV_FIELDS]))
     for decision in search.query():
+        _logger.warning(decision.values)
         if args.download:
             decision.fetch()
             if args.dump:

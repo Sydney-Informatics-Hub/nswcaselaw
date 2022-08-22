@@ -9,26 +9,30 @@ from nswcaselaw.constants import CASELAW_BASE_URL
 
 FETCH_PAUSE_SECONDS = 5
 
+SCRAPER_WARNING = """
+Warning: this tool has only been tested on Supreme Court judgments. Use on
+decision from other tribunals is unlikely to work.
+"""
+
 _logger = logging.getLogger(__name__)
 
 BASE_FIELDS = [
     "title",
-    "before",
-    "date",
-    "catchwords",
     "uri",
+    "before",
+    "decisionDate",
+    "catchwords",
 ]
 
 CSV_FIELDS = [
     "title",
     "uri",
-    "date",
+    "decisionDate",
     "mnc",
     "before",
     "catchwords",
     "hearingDates",
     "dateOfOrders",
-    "decisionDate",
     "jurisdiction",
     "decision",
     "legislationCited",
@@ -63,10 +67,6 @@ class Decision:
         return self._values.get("before")
 
     @property
-    def date(self):
-        return self._values.get("date")
-
-    @property
     def catchwords(self):
         return self._values.get("catchwords")
 
@@ -75,16 +75,16 @@ class Decision:
         return self._values.get("uri")
 
     @property
+    def decisionDate(self):
+        return self._values.get("decisionDate")
+
+    @property
     def hearingDates(self):
         return self._values.get("hearingDates")
 
     @property
     def dateOfOrders(self):
         return self._values.get("dateOfOrders")
-
-    @property
-    def decisionDate(self):
-        return self._values.get("decisionDate")
 
     @property
     def jurisdiction(self):
@@ -129,7 +129,7 @@ class Decision:
             parts = self.uri.split("/")
             return parts[-1]
         else:
-            return None
+            raise ValueError("Called id when uri not set")
 
     @property
     def values(self):
@@ -146,7 +146,7 @@ class Decision:
                 for p in [
                     self.title,
                     self.uri,
-                    self.date,
+                    self.decisionDate,
                     self.before,
                     self.catchwords,
                 ]
@@ -185,20 +185,20 @@ class Decision:
             return self.scrape(html)
 
     def _warning(self, message):
-        """
-        Emits a warning with this decisions URI and title prepended
-        """
         _logger.warning(f"[{self.uri} {self.title}] {message}")
 
     def scrape(self, html):
         self._soup = BeautifulSoup(html, "html.parser")
-        scraper = self._get_scraper()
-        self._warning(f"Scraping with {scraper}")
-        self._values = scraper.scrape()
-        return True
-        # except Exception as e:
-        #     self._warning(f"Scrape failed: {e}")
-        #     return False
+        try:
+            scraper = self._get_scraper()
+            self._warning(f"Scraping with {scraper}")
+            scraped_values = scraper.scrape()
+            for k, v in scraped_values.items():
+                self._values[k] = v
+            return self._values
+        except Exception as e:
+            self._warning(f"Scrape failed: {e}")
+            return False
 
     def _get_scraper(self):
         """
@@ -230,6 +230,7 @@ class Scraper:
     def scrape(self):
         data = self._scrape_metadata()
         data["title"] = self._scrape_title()
+        data["uri"] = self._scrape_uri()
         return data
 
     def _strings(self, elt):
@@ -255,6 +256,19 @@ class Scraper:
             return title_text.strip()
         else:
             self._warning("No title tag")
+
+    def _scrape_uri(self):
+        """
+        Bit of a hack to deduce the URI from the HTML for those cases (tests)
+        where we didn't already download it from the URI
+        """
+        if self._decision.uri:
+            return self._decision.uri
+        links = self._soup.find_all("a")
+        dl_links = [a for a in links if a.get("href", "")[:9] == "/decision"]
+        if dl_links:
+            href = dl_links[0]["href"].split("/")
+            return "/".join(href[:3])
 
 
 class NewScScraper(Scraper):

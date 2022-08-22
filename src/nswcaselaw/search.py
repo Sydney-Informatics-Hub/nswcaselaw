@@ -163,7 +163,7 @@ class Search:
                 uri=uri,
                 catchwords=catchwords,
                 before=before,
-                date=date,
+                decisionDate=date,
             )
         except Exception as e:
             _logger.warn(f"HTML parse error {e}")

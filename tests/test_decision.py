@@ -8,11 +8,11 @@ _logger = logging.getLogger(__name__)
 
 
 def test_basic_fields(scrape_fixtures):
-    md = scrape_fixtures["basic_metadata"]
+    md = scrape_fixtures["metadata"]
     d = Decision(**md)
     assert d.title == md["title"]
     assert d.before == md["before"]
-    assert d.date == md["date"]
+    assert d.decisionDate == md["decisionDate"]
     assert d.catchwords == md["catchwords"]
     assert d.uri == md["uri"]
 
