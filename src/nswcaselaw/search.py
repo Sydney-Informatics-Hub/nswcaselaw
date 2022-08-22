@@ -109,6 +109,10 @@ class Search:
         r = requests.get(CASELAW_SEARCH_URL, self._params)
         if r.status_code == 200:
             n_results, results = self.scrape_results(r.text)
+            if n_results == 0:
+                _logger.warning("No results matched your query")
+                return
+            _logger.warning(f"{n_results} {results}")
             for result in results:
                 yield result
         n_pages = (n_results - 1) // PAGE_SIZE + 1
@@ -133,9 +137,12 @@ class Search:
         if not m:
             raise CaseLawException("Couldn't get number of results from HTML")
         n_results = int(m[1])
-        results = soup.find_all("div", {"class": "row result"})
-        decisions = [self.scrape_decision(r) for r in results]
-        return n_results, decisions
+        if n_results:
+            results = soup.find_all("div", {"class": "row result"})
+            decisions = [self.scrape_decision(r) for r in results]
+            return n_results, decisions
+        else:
+            return n_results, []
 
     def scrape_decision(self, row):
         try:

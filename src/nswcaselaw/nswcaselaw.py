@@ -152,9 +152,10 @@ def run_query(args: argparse.Namespace):
         tribunals=args.tribunals,
     )
     n = 0
-    print(",".join([f'"{f}"' for f in CSV_FIELDS]))
     for decision in search.query():
-        _logger.warning(decision.values)
+        if n == 0:
+            # only print the header if there's at least one result
+            print(",".join([f'"{f}"' for f in CSV_FIELDS]))
         if args.download:
             decision.fetch()
             if args.dump:
