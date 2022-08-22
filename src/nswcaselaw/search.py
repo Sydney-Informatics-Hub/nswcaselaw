@@ -6,7 +6,8 @@ from typing import Generator, List, Tuple
 import requests
 from bs4 import BeautifulSoup
 
-from nswcaselaw.constants import CASELAW_SEARCH_URL, COURTS
+from nswcaselaw.constants import CASELAW_SEARCH_URL, COURTS, index_to_court
+from nswcaselaw.decision import Decision
 
 _logger = logging.getLogger(__name__)
 
@@ -30,87 +31,43 @@ COURTS_FIELDS = ["courts", "tribunals"]
 RESULTS_RE = re.compile(r"Displaying \d+ - \d+ of (\d+)")
 PAGE_SIZE = 20
 
-PAUSE_SECONDS = 20
+SEARCH_PAUSE_SECONDS = 5
 
 
 class CaseLawException(Exception):
     pass
 
 
-class Decision:
-    """
-    Class representing a Decision in CaseLaw. These are returned by the
-    Search object with the metadata which is given in the results page.
-    The rest of the object's data can be retrieved with the Decision's
-    fetch method.
-    """
-
-    def __init__(self, **kwargs):
-        self._title = kwargs.get("title")
-        self._before = kwargs.get("before")
-        self._date = kwargs.get("date")
-        self._catchwords = kwargs.get("catchwords")
-        self._uri = kwargs.get("uri")
-
-    def __repr__(self):
-        """
-        Returns the decision fields which are available from the search
-        results page as a comma-separated list in quotes.
-        """
-        return ",".join(
-            [
-                f'"{p}"'
-                for p in [
-                    self._title,
-                    self._uri,
-                    self._date,
-                    self._before,
-                    self._catchwords,
-                ]
-            ]
-        )
-
-    @property
-    def title(self):
-        return self._title
-
-    @property
-    def before(self):
-        return self._before
-
-    @property
-    def date(self):
-        return self._date
-
-    @property
-    def catchwords(self):
-        return self._catchwords
-
-    @property
-    def link(self):
-        return self._uri
-
-    def fetch(self):
-        """
-        Load and scrape the body of this decision
-        """
-
-        pass
-
-
 class Search:
     """
-    Class representing a CaseLaw query. Intialise it with a dictionary
-    of search parameters.
+    Class representing a CaseLaw query.
+
+    Keyword args:
+        body (str)
+        title (str)
+        before (str) - name of judge etc
+        catchwords (str)
+        party (str)
+        mnc (str) - citation
+        startDate (str) - start date as "dd/mm/yyyy"
+        endDate (str) - end date as "dd/mm/yyyy"
+        fileNumber (str)
+        legislationCited (str)
+        casesCited (str)
+        courts (list of int) - indices starting at 1 from court list
+        tribunals (list of int) - indices starting at 1 from tribunals list
+
     """
 
     def __init__(self, **kwargs):
         self._query = {}
-        for field in TEXT_FIELDS:
-            self._query[field] = kwargs.get(field)
-        for field in COURTS_FIELDS:
+        for field in TEXT_FIELDS + COURTS_FIELDS:
             self._query[field] = kwargs.get(field)
         self._params = None
+
+    @property
+    def params(self):
+        return self._params
 
     def build_query(self):
         """
@@ -127,12 +84,16 @@ class Search:
 
     def courts_query(self, court_type: str, indices: List[int]) -> List[Tuple[str]]:
         """
-        Generates a big list of court or tribunal params with the ones the
+        Generates a list of court or tribunal params with the ones the
         user has selected switched on.
         """
         params = []
+        if indices is not None:
+            ids = [index_to_court(court_type, idx)[0] for idx in indices]
+        else:
+            ids = []
         for court in COURTS[court_type]:
-            if court[0] in indices:
+            if court[0] in ids:
                 params.append((court_type, court[0]))
             params.append(("_" + court_type, "on"))
         return params
@@ -152,7 +113,7 @@ class Search:
                 yield result
         n_pages = (n_results - 1) // PAGE_SIZE + 1
         for page in range(1, n_pages):
-            time.sleep(PAUSE_SECONDS)
+            time.sleep(SEARCH_PAUSE_SECONDS)
             self._params[0] = ("page", str(page))
             _logger.info(f"Fetching page {page + 1} of {n_pages}...")
             r = requests.get(CASELAW_SEARCH_URL, self._params)
@@ -166,6 +127,8 @@ class Search:
     def scrape_results(self, html) -> List[str]:
         soup = BeautifulSoup(html, "html.parser")
         header_strings = list(soup.find("h1").stripped_strings)
+        if len(header_strings) < 2:
+            raise CaseLawException("Couldn't get results element from HTML")
         m = RESULTS_RE.match(header_strings[1])
         if not m:
             raise CaseLawException("Couldn't get number of results from HTML")
@@ -200,7 +163,7 @@ class Search:
                 uri=uri,
                 catchwords=catchwords,
                 before=before,
-                date=date,
+                decisionDate=date,
             )
         except Exception as e:
             _logger.warn(f"HTML parse error {e}")

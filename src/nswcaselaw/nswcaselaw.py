@@ -1,9 +1,12 @@
 import argparse
+import json
 import logging
 import sys
+from pathlib import Path
 
 from nswcaselaw import __version__
-from nswcaselaw.constants import COURTS, court_id
+from nswcaselaw.constants import COURTS
+from nswcaselaw.decision import CSV_FIELDS, SCRAPER_WARNING, Decision
 from nswcaselaw.search import Search
 
 __author__ = "Mike Lynch"
@@ -59,13 +62,18 @@ def parse_args(args):
         choices=["courts", "tribunals"],
         help="Print a list of courts or tribunals",
     )
+    parser.add_argument(
+        "--dump", type=Path, default=None, help="Dir to dump HTML for debugging"
+    )
+    parser.add_argument(
+        "--test-parse",
+        type=Path,
+        default=None,
+        help="Test scraper on an HTML document and print results as JSON",
+    )
     parser.add_argument("--body", type=str, help="Full text search")
     parser.add_argument("--title", type=str, help="Case name")
-    parser.add_argument(
-        "--before",
-        type=str,
-        help="Judge, commissioner, magistrate, member, registrar or assessor",
-    )
+    parser.add_argument("--before", type=str)
     parser.add_argument("--catchwords", type=str)
     parser.add_argument("--party", type=str)
     parser.add_argument("--citation", type=str, help="Must include square brackets")
@@ -88,6 +96,13 @@ def parse_args(args):
         default=[],
         help="Select one or more by index number (see --list tribunals)",
     )
+    parser.add_argument(
+        "--download",
+        type=Path,
+        default=None,
+        help="Download full judgments and write JSON to this directory",
+    )
+    parser.add_argument("--limit", type=int, default=None, help="Max results")
     return parser.parse_args(args)
 
 
@@ -99,7 +114,7 @@ def setup_logging(loglevel):
     """
     logformat = "[%(asctime)s] %(levelname)s:%(name)s:%(message)s"
     logging.basicConfig(
-        level=loglevel, stream=sys.stdout, format=logformat, datefmt="%Y-%m-%d %H:%M:%S"
+        level=loglevel, stream=sys.stderr, format=logformat, datefmt="%Y-%m-%d %H:%M:%S"
     )
 
 
@@ -109,6 +124,53 @@ def list_courts(court_type: str):
     """
     for index, (_, name) in enumerate(COURTS[court_type]):
         print(f"{index + 1:2d}. {name}")
+    print(SCRAPER_WARNING)
+
+
+def test_scrape(test_file):
+    d = Decision()
+    if d.load_file(test_file):
+        print(json.dumps(d.values, indent=2))
+    else:
+        print(f"scrape of {test_file} failed")
+
+
+def run_query(args: argparse.Namespace):
+    search = Search(
+        body=args.body,
+        title=args.title,
+        before=args.before,
+        catchwords=args.catchwords,
+        party=args.party,
+        mnc=args.citation,
+        startDate=args.startDate,
+        endDate=args.endDate,
+        fileNumber=args.fileNumber,
+        legislationCited=args.legislationCited,
+        casesCited=args.casesCited,
+        courts=args.courts,
+        tribunals=args.tribunals,
+    )
+    n = 0
+    print(",".join([f'"{f}"' for f in CSV_FIELDS]))
+    for decision in search.query():
+        _logger.warning(decision.values)
+        if args.download:
+            decision.fetch()
+            if args.dump:
+                htmlfile = (args.dump / decision.id).with_suffix(".html")
+                with open(htmlfile, "w") as fh:
+                    if decision.html is not None:
+                        fh.write(decision.html)
+                    else:
+                        fh.write("No content")
+            jsonfile = (args.download / decision.id).with_suffix(".json")
+            with open(jsonfile, "w") as fh:
+                fh.write(json.dumps(decision.values, indent=2))
+        print(decision.csv)
+        n += 1
+        if args.limit and n > args.limit:
+            return
 
 
 def main(args):
@@ -119,31 +181,23 @@ def main(args):
     """
     args = parse_args(args)
     setup_logging(args.loglevel)
-    if args.list:
-        list_courts(args.list)
+    if args.test_parse:
+        test_scrape(args.test_parse)
     else:
-        if not (args.courts or args.tribunals):
-            _logger.error("You must select at least one court or tribunal")
+        if args.list:
+            list_courts(args.list)
         else:
-            courts = [court_id("courts", c)[0] for c in args.courts]
-            tribunals = [court_id("tribunals", c)[0] for c in args.tribunals]
-            search = Search(
-                body=args.body,
-                title=args.title,
-                before=args.before,
-                catchwords=args.catchwords,
-                party=args.party,
-                mnc=args.citation,
-                startDate=args.startDate,
-                endDate=args.endDate,
-                fileNumber=args.fileNumber,
-                legislationCited=args.legislationCited,
-                casesCited=args.casesCited,
-                courts=courts,
-                tribunals=tribunals,
-            )
-            for r in search.query():
-                print(r)
+            if not (args.courts or args.tribunals):
+                _logger.error(
+                    """
+You must select at least one court or tribunal.
+
+Use the --list courts or --list tribunals options for a list of available
+options.
+"""
+                )
+            else:
+                run_query(args)
 
 
 def run():

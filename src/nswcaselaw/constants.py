@@ -3,7 +3,8 @@ from typing import Dict, List, Tuple
 import requests
 from bs4 import BeautifulSoup
 
-CASELAW_SEARCH_URL = "https://www.caselaw.nsw.gov.au/search/advanced"
+CASELAW_BASE_URL = "https://www.caselaw.nsw.gov.au"
+CASELAW_SEARCH_URL = f"{CASELAW_BASE_URL}/search/advanced"
 
 # I'm keeping two lists for courts and tribunals, even though their ids
 # don't overlap now - the search API separates them, so in theory they
@@ -84,7 +85,7 @@ def fetch_courts() -> Dict[str, List[Tuple[str, str]]]:
     return None
 
 
-def court_id(court_type: str, court_idx: int) -> Tuple[str, str]:
+def index_to_court(court_type: str, court_idx: int) -> Tuple[str, str]:
     """
     Return the tuple for court or tribunal n, starting at 1
     """
