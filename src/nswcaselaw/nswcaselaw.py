@@ -1,3 +1,19 @@
+"""A module for downloading NSW case law decisions
+
+nswcaselaw is a module for downloading and parsing court and tribunal
+decisions from https://www.caselaw.nsw.gov.au/
+
+    from nswcaselaw.search import Search
+
+    search = Search(courts=[13], catchwords="defamation")
+
+    for decision in search.results():
+        print(f"Case: {decision.title}")
+        decision.fetch()
+        judgment = decision.judgment
+
+"""
+
 import argparse
 import json
 import logging
@@ -14,14 +30,6 @@ __copyright__ = "The University of Sydney"
 __license__ = "MIT"
 
 _logger = logging.getLogger(__name__)
-
-# WAIT_TIME
-
-
-# ---- CLI ----
-# The functions defined in this section are wrappers around the main Python
-# API allowing them to be called directly from the terminal as a CLI
-# executable/script.
 
 
 def parse_args(args):
@@ -119,15 +127,27 @@ def setup_logging(loglevel):
 
 
 def list_courts(court_type: str):
+    """Print a list of courts or tribunals, with indices, to stdout
+
+    Args:
+      court_type (str): either "courts" or "tribunals"
     """
-    Print a list of courts or tribunals, with indices, to stdout
-    """
-    for index, (_, name) in enumerate(COURTS[court_type]):
-        print(f"{index + 1:2d}. {name}")
-    print(SCRAPER_WARNING)
+    if court_type not in COURTS:
+        _logger.error("Court type must be either 'courts' or 'tribunals'")
+    else:
+        for index, (_, name) in enumerate(COURTS[court_type]):
+            print(f"{index + 1:2d}. {name}")
+        print(SCRAPER_WARNING)
 
 
-def test_scrape(test_file):
+def test_scrape(test_file: str):
+    """Load an HTML file and scrape it, printing the results as JSON.
+
+    Used for testing development of different scraper backends.
+
+    Args:
+      test_file (str): file to scrape
+    """
     d = Decision()
     if d.load_file(test_file):
         print(json.dumps(d.values, indent=2))
@@ -136,6 +156,13 @@ def test_scrape(test_file):
 
 
 def run_query(args: argparse.Namespace):
+    """Run a search query against caselaw, printing the search results as
+    CSV, and downloading the full decision text as JSON into a directory if
+    one is provided
+
+    Args:
+      :obj:`argparse.Namespace`: command line parameters namespace
+    """
     search = Search(
         body=args.body,
         title=args.title,
@@ -152,7 +179,7 @@ def run_query(args: argparse.Namespace):
         tribunals=args.tribunals,
     )
     n = 0
-    for decision in search.query():
+    for decision in search.results():
         if n == 0:
             # only print the header if there's at least one result
             print(",".join([f'"{f}"' for f in CSV_FIELDS]))

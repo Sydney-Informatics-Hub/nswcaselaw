@@ -1,6 +1,11 @@
+"""Classes for working with individual judgments
+"""
+
+
 import logging
 import re
 import time
+from typing import List
 
 import requests
 from bs4 import BeautifulSoup
@@ -125,7 +130,7 @@ class Decision:
 
     @property
     def id(self):
-        """The unique identifier in the decision URI"""
+        """Returns the unique identifier in the decision URI"""
         if self.uri:
             parts = self.uri.split("/")
             return parts[-1]
@@ -137,8 +142,7 @@ class Decision:
         return self._values
 
     def __repr__(self):
-        """
-        Returns the decision fields which are available from the search
+        """Returns the decision fields which are available from the search
         results page as a comma-separated list in quotes.
         """
         return ",".join(
@@ -156,7 +160,8 @@ class Decision:
 
     @property
     def csv(self):
-        """TODO: use a csv library for this"""
+        """Returns all of the decision's fields except for the judgment
+        as a CSV-safe string with double-quotes escaped."""
         if self._csv is None:
             values = [self._csv_value(p) for p in CSV_FIELDS]
             self._csv = ",".join([f'"{v}"' for v in values])
@@ -171,24 +176,43 @@ class Decision:
         return v
 
     def fetch(self):
-        """
-        Load and scrape the body of this decision
+        """Downloads the full decision from CaseLaw and scrapes it. Returns
+        a dictionary of the scraped values.
+
+        Returns:
+          dict of str: str
         """
         r = requests.get(CASELAW_BASE_URL + self.uri)
         if r.status_code == 200:
             self._html = r.text
-            self.scrape(self._html)
+            return self.scrape(self._html)
         time.sleep(FETCH_PAUSE_SECONDS)
 
     def load_file(self, test_file):
+        """Load an HTML file and scrape the contents
+
+        Args:
+          test_file (str): the file to load
+        Returns:
+          Dict of (str: str): the scraped values
+        """
         with open(test_file, "r") as fh:
             html = fh.read()
             return self.scrape(html)
 
     def _warning(self, message):
+        """Logs a warning, adding this decision's uri and title"""
         _logger.warning(f"[{self.uri} {self.title}] {message}")
 
     def scrape(self, html):
+        """Scrape an HTML decision, populating this object's _values dict
+        and returning the values as a dict.
+
+        Args:
+          html (str): the HTML
+        Returns:
+          Dict of (str: str): the scraped values
+        """
         self._soup = BeautifulSoup(html, "html.parser")
         try:
             scraper = self._get_scraper()
@@ -202,9 +226,11 @@ class Decision:
             return False
 
     def _get_scraper(self):
-        """
-        Determing which scraper to use, based on the soup. This should maybe
-        be part of the Scraper class?
+        """Using features from the parsed HTML, deduce which Scraper subclass
+        should be used, instantiate it and return it
+
+        Returns:
+          :obj:`nswcaselaw.decision.Scraper`: A Scraper
         """
         dts = self._soup.find_all("dt")
         if not dts:
@@ -226,30 +252,58 @@ class Scraper:
         self._values = {}
 
     def _warning(self, message):
+        """Issue a warning via the Scraper's parent Decision so that it gets
+        identified with the decision uri and title"""
         self._decision._warning(message)
 
     def scrape(self):
+        """Top-level scrape method
+
+        Returns:
+          Dict(str: str): the values scraped from the HTML
+        """
         data = self._scrape_metadata()
         data["title"] = self._scrape_title()
         data["uri"] = self._scrape_uri()
         return data
 
     def _strings(self, elt):
+        """Utility to get the text content of an element"""
         return "\n".join(elt.stripped_strings)
 
-    def _fix_whitespace(self, values):
+    def _fix_whitespace(self, values: List[str]):
+        """Replaces all newlines in an array of values with spaces
+
+        Args:
+          values (List(str)) - list of strings
+
+        Returns:
+          List(str)
+        """
         return [v.replace("\n", " ") for v in values]
 
-    def _find_value(self, pattern):
-        matches = [f for f in self._raw.keys() if pattern in f]
+    def _find_value(self, substring):
+        """Look for a substring in the keys of the _raw dict, which are values
+        the scraper has got from whatever tabular representation is in its
+        version of the HTML. Warns if there is no matching value, or if there
+        is more than one.
+
+        Args:
+          substring (str): a string to search for in the _raw keys
+
+        Returns:
+          str: the first value which matches, or an empty string
+        """
+        matches = [f for f in self._raw.keys() if substring in f]
         if not matches:
-            self._warning(f"{pattern} not found")
+            self._warning(f"{substring} not found")
             return ""
         if len(matches) > 1:
-            self._warning(f"Multiple matches for {pattern}")
+            self._warning(f"Multiple matches for {substring}")
         return self._raw[matches[0]]
 
     def _scrape_title(self):
+        """Gets the case title from the <title> tag."""
         title = self._soup.find("title")
         if title:
             title_text = " ".join(title.stripped_strings)
@@ -259,9 +313,8 @@ class Scraper:
             self._warning("No title tag")
 
     def _scrape_uri(self):
-        """
-        Bit of a hack to deduce the URI from the HTML for those cases (tests)
-        where we didn't already download it from the URI
+        """Deduce the URI from the HTML for those cases (tests) where we didn't\
+        already download it from the URI
         """
         if self._decision.uri:
             return self._decision.uri
@@ -273,8 +326,10 @@ class Scraper:
 
 
 class NewScScraper(Scraper):
+    """Scraper for more recent Supreme Court judgments, which use a <dt> <dd>
+    list for the metadata"""
 
-    PATTERNS = {
+    SUBSTRINGS = {
         "mnc": "Medium Neutral Citation",
         "hearingDates": "Hearing dates",
         "dateOfOrders": "Date of orders",
@@ -292,6 +347,7 @@ class NewScScraper(Scraper):
     }
 
     def _scrape_metadata(self):
+        """Scrape the core metadata from the soup object"""
         for dt in self._soup.find_all("dt"):
             dd = dt.find_next_sibling("dd")
             header = dt.string
@@ -301,8 +357,8 @@ class NewScScraper(Scraper):
             else:
                 self._raw[header] = self._strings(dd)
 
-        for field, pattern in self.PATTERNS.items():
-            self._values[field] = self._find_value(pattern)
+        for field, substring in self.SUBSTRINGS.items():
+            self._values[field] = self._find_value(substring)
 
         # some new-style decisions don't wrap catchwords, legslation or
         # cases in <p> tags - split these on newlines
@@ -321,17 +377,23 @@ class NewScScraper(Scraper):
         return self._values
 
     def _ensure_list(self, value):
+        """Some catchwords and lists of legislation and cases cited are not
+        delimited by <p> tags, but are separated by newlines. This method
+        normalises them into lists of strings.
+        """
         if type(value) == list:
             return value
         else:
             return value.split("\n")
 
     def _catchwords(self, catchwords):
+        """Normalise catchwords and split them on dashes or hyphens"""
         if catchwords is None or not catchwords:
             return []
         return [cw.strip() for cw in re.split("[\u2014-]", catchwords[0])]
 
     def _scrape_judgment(self):
+        """Parse the body of the judgment into a list of paragraphs"""
         body = self._soup.find("div", {"class": "body"})
         if not body:
             self._warning("Couldn't find <div> with judgment")
@@ -353,7 +415,7 @@ class NewScScraper(Scraper):
         return paragraphs
 
     def _ignored_paras(self, p):
-        """check for old-style judgment paragraphs which we want to ignore"""
+        """Test for old-style judgment paragraphs which we want to ignore"""
         if "class" in p.attrs:
             if "disclaimer" in p["class"] or "lastupdate" in p["class"]:
                 return True
@@ -364,8 +426,10 @@ class NewScScraper(Scraper):
 
 
 class OldScScraper(Scraper):
+    """Scraper for more recent Supreme Court judgments, which use a <dt> <dd>
+    list for the metadata"""
 
-    PATTERNS = {
+    SUBSTRINGS = {
         "mnc": "CITATION",
         "hearingDates": "HEARING DATE",
         "dateOfOrders": "DATE OF ORDERS",
@@ -384,6 +448,7 @@ class OldScScraper(Scraper):
     }
 
     def _scrape_metadata(self):
+        """Scrape the core metadata from the soup object"""
         rows = self._soup.find_all("tr")
         if not rows:
             return {}
@@ -393,8 +458,8 @@ class OldScScraper(Scraper):
                 header = self._strings(cells[1])
                 self._raw[header] = self._strings(cells[2])
 
-        for field, pattern in self.PATTERNS.items():
-            self._values[field] = self._find_value(pattern)
+        for field, substring in self.SUBSTRINGS.items():
+            self._values[field] = self._find_value(substring)
         self._values["catchwords"] = self._catchwords(self._values["catchwords"])
         for f in ["legislationCited", "casesCited", "parties", "counsel", "solicitors"]:
             self._values[f] = self._values[f].split("\n")
@@ -408,11 +473,13 @@ class OldScScraper(Scraper):
         return self._values
 
     def _catchwords(self, catchwords):
+        """Normalise catchwords and split them on dashes or hyphens"""
         if catchwords is None:
             return []
         return [cw.strip() for cw in catchwords.split("-")]
 
     def _scrape_judgment(self):
+        """Parse the body of the judgment into a list of paragraphs"""
         paragraphs = []
         for tr in self._soup.find_all("tr"):
             for td in tr.find_all("td"):

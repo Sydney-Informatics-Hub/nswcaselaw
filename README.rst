@@ -10,13 +10,15 @@ nswcaselaw
 ==========
 
 
-    A Python toolkit for working with NSW CaseLaw
+    A Python module for working with NSW CaseLaw
 
 
 A Python toolkit for downloading and extracting textual data from the NSW
-CaseLaw database
+CaseLaw website at https://www.caselaw.nsw.gov.au/
 
-.. _pyscaffold-notes:
+Usage
+=====
+
 
 Note
 ====

@@ -98,11 +98,11 @@ class Search:
             params.append(("_" + court_type, "on"))
         return params
 
-    def query(self) -> Generator[Decision, None, None]:
+    def results(self) -> Generator[Decision, None, None]:
         """
         Runs a query against CaseLaw, repeating it for as many pages as are
-        needed to get all of the matching results. Pauses between pages so that
-        we don't get banned.
+        needed to get all of the matching results. Pauses between pages to
+        be polite.
         """
         self.build_query()
         _logger.info("Fetching page 1...")
@@ -139,12 +139,12 @@ class Search:
         n_results = int(m[1])
         if n_results:
             results = soup.find_all("div", {"class": "row result"})
-            decisions = [self.scrape_decision(r) for r in results]
+            decisions = [self.scrape_one_result(r) for r in results]
             return n_results, decisions
         else:
             return n_results, []
 
-    def scrape_decision(self, row):
+    def scrape_one_result(self, row):
         try:
             header = row.find("h4")
             link = header.find("a")
