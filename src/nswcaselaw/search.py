@@ -112,7 +112,6 @@ class Search:
             if n_results == 0:
                 _logger.warning("No results matched your query")
                 return
-            _logger.warning(f"{n_results} {results}")
             for result in results:
                 yield result
         n_pages = (n_results - 1) // PAGE_SIZE + 1
