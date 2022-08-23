@@ -10,8 +10,9 @@ from nswcaselaw.constants import CASELAW_BASE_URL
 FETCH_PAUSE_SECONDS = 5
 
 SCRAPER_WARNING = """
-Warning: this tool has only been tested on Supreme Court judgments. Use on
-decision from other tribunals is unlikely to work.
+Warning: downloading full decisions has only been tested on the Supreme Court.
+While results can be downloaded for other courts and tribunals, full decisions
+are unlikely to work.
 """
 
 _logger = logging.getLogger(__name__)

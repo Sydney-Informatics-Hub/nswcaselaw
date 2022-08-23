@@ -100,7 +100,7 @@ def parse_args(args):
         "--download",
         type=Path,
         default=None,
-        help="Download full judgments and write JSON to this directory",
+        help="Save decisions as JSON to the directory DOWNLOAD",
     )
     parser.add_argument("--limit", type=int, default=None, help="Max results")
     return parser.parse_args(args)
