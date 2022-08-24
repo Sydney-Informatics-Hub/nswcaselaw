@@ -131,7 +131,7 @@ class Search:
             else:
                 raise CaseLawException(f"Bad status_code {r.status_code}")
 
-    def scrape_results(self, html) -> Tuple(int, List[Decision]):
+    def scrape_results(self, html) -> Tuple[int, List[Decision]]:
         """Parse a page of search results and return the total number of
         results and a list of Decision objects from this page of results
 
