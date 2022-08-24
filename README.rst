@@ -9,17 +9,41 @@
 nswcaselaw
 ==========
 
-
-    A Python module for working with NSW CaseLaw
-
-
 A Python toolkit for downloading and extracting textual data from the NSW
 CaseLaw website at https://www.caselaw.nsw.gov.au/
 
 Usage
 =====
 
+Sample usage in Python code or a Jupyter notebook::
 
+  from nswcaselaw.search import Search
+  import json
+
+  query = Search(courts=[13], catchwords="succession")
+
+  for decision in query.results():
+      decision.fetch()
+      print(json.dumps(decision.values, indent=2))
+
+
+CLI tool 
+========
+
+To generate a CSV of search results::
+
+  nswcaselaw --courts 13 --catchwords succession --output cases.csv
+
+To download complete decisions as JSON documents::
+
+  nswcaselaw --courts 13 --catchwords succession --output cases.csv  --downloads ./decisions
+
+To list available courts and tribunals (NOTE: full web scraping is only
+tested on Supreme Court decisions)::
+
+  nswcaselaw --list courts
+  nswcaselaw --list tribunals
+  
 Note
 ====
 
