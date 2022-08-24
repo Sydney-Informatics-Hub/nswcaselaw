@@ -15,6 +15,7 @@ decisions from https://www.caselaw.nsw.gov.au/
 """
 
 import argparse
+import csv
 import json
 import logging
 import sys
@@ -105,6 +106,11 @@ def parse_args(args):
         help="Select one or more by index number (see --list tribunals)",
     )
     parser.add_argument(
+        "--output",
+        type=Path,
+        help="Search results will be written to this file as CSV",
+    )
+    parser.add_argument(
         "--download",
         type=Path,
         default=None,
@@ -179,26 +185,54 @@ def run_query(args: argparse.Namespace):
         tribunals=args.tribunals,
     )
     n = 0
-    for decision in search.results():
-        if n == 0:
-            # only print the header if there's at least one result
-            print(",".join([f'"{f}"' for f in CSV_FIELDS]))
-        if args.download:
-            decision.fetch()
-            if args.dump:
-                htmlfile = (args.dump / decision.id).with_suffix(".html")
-                with open(htmlfile, "w") as fh:
-                    if decision.html is not None:
-                        fh.write(decision.html)
-                    else:
-                        fh.write("No content")
-            jsonfile = (args.download / decision.id).with_suffix(".json")
-            with open(jsonfile, "w") as fh:
-                fh.write(json.dumps(decision.values, indent=2))
-        print(decision.csv)
-        n += 1
-        if args.limit and n > args.limit:
-            return
+    with output_stream(args.output) as fh:
+        csvout = csv.writer(fh, dialect="excel")
+        for decision in search.results():
+            if n == 0:
+                # only print the header if there's at least one result
+                csvout.writerow(CSV_FIELDS)
+            if args.download:
+                download_decision(decision, args)
+            csvout.writerow(decision.row)
+            n += 1
+            if args.limit and n >= args.limit:
+                break
+
+
+def output_stream(outfile):
+    """Either opens a file for output, or returns stdout if the filename is
+    empty.
+
+    Args:
+      outfile (str): a filename or ''
+    Return:
+      :obj:`_io.TextIOWrapper`: an output stream
+    """
+    if outfile:
+        return open(outfile, "w", newline="")
+    else:
+        return sys.stdout
+
+
+def download_decision(decision, args):
+    """Fetch the full detains for a decision, and write out the JSON, and
+    optionally the HTML, to the download and dump directory
+
+    Args:
+      decision (:obj:`nswcaselaw.decision.Decision`): a decision
+      args: (:obj:`argparse.Namespace`:): the command-line args
+    """
+    decision.fetch()  # what happens if this fails?
+    if args.dump:
+        htmlfile = (args.dump / decision.id).with_suffix(".html")
+        with open(htmlfile, "w") as fh:
+            if decision.html is not None:
+                fh.write(decision.html)
+            else:
+                fh.write("No content")
+    jsonfile = (args.download / decision.id).with_suffix(".json")
+    with open(jsonfile, "w") as fh:
+        fh.write(json.dumps(decision.values, indent=2))
 
 
 def main(args):

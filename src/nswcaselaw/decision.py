@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 
 from nswcaselaw.constants import CASELAW_BASE_URL
 
-FETCH_PAUSE_SECONDS = 5
+FETCH_PAUSE_SECONDS = 10
 
 SCRAPER_WARNING = """
 Warning: downloading full decisions has only been tested on the Supreme Court.
@@ -62,7 +62,7 @@ class Decision:
         self._values = {}
         for field in BASE_FIELDS:
             self._values[field] = kwargs.get(field)
-        self._csv = None
+        self._row = None
 
     @property
     def title(self):
@@ -158,21 +158,27 @@ class Decision:
             ]
         )
 
-    @property
-    def csv(self):
-        """Returns all of the decision's fields except for the judgment
-        as a CSV-safe string with double-quotes escaped."""
-        if self._csv is None:
-            values = [self._csv_value(p) for p in CSV_FIELDS]
-            self._csv = ",".join([f'"{v}"' for v in values])
-            self._csv = self._csv.replace("\n", " ")
-        return self._csv
+    # @property
+    # def csv(self):
+    #     """Returns all of the decision's fields except for the judgment
+    #     as a CSV-safe string with double-quotes escaped."""
+    #     if self._csv is None:
+    #         values = [self._flat_value(p) for p in CSV_FIELDS]
+    #         self._csv = ",".join([f'"{v}"' for v in values])
+    #         self._csv = self._csv.replace("\n", " ")
+    #     return self._csv
 
-    def _csv_value(self, field):
+    @property
+    def row(self):
+        if self._row is None:
+            self._row = [self._flat_value(p) for p in CSV_FIELDS]
+        return self._row
+
+    def _flat_value(self, field):
         v = self._values.get(field, "")
         if type(v) == list:
             v = "; ".join(v)
-        v = v.replace('"', "'")
+        # v = v.replace('"', "'")
         return v
 
     def fetch(self):
@@ -183,10 +189,10 @@ class Decision:
           dict of str: str
         """
         r = requests.get(CASELAW_BASE_URL + self.uri)
+        time.sleep(FETCH_PAUSE_SECONDS)
         if r.status_code == 200:
             self._html = r.text
             return self.scrape(self._html)
-        time.sleep(FETCH_PAUSE_SECONDS)
 
     def load_file(self, test_file):
         """Load an HTML file and scrape the contents
