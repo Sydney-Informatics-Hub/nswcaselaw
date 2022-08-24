@@ -44,6 +44,37 @@ tested on Supreme Court decisions)::
   nswcaselaw --list courts
   nswcaselaw --list tribunals
   
+
+Installation
+============
+
+Follow the instructions at https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html to install Conda.
+
+To create a conda environment with Jupyter and nswcaselaw::
+
+  conda create -n mycaselaw jupyter
+  conda activate mycaselaw
+  pip install nswcaselaw
+  
+Once the dependencies are installed::
+
+  jupyter notebook
+
+will start Jupyter and open a browser. Any notebooks you create in this will
+be able to import the nswcaselaw module as shown above::
+
+  from nswcaselaw.search import Search
+
+To install nswcaselaw without Jupyter, follow the same steps to install Conda,
+and then create a new environment as follows::
+
+  conda create -n mycaselaw
+  conda activate mycaselaw
+  pip install nswcaselaw
+
+You should now be able to use the `nswcaselaw` command from a terminal (on
+Mac or Linux) or the Anaconda prompt (on Windows).
+
 Note
 ====
 
