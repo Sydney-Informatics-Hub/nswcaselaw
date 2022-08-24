@@ -72,7 +72,7 @@ and then create a new environment as follows::
   conda activate mycaselaw
   pip install nswcaselaw
 
-You should now be able to use the `nswcaselaw` command from a terminal (on
+You should now be able to use the ``nswcaselaw`` command from a terminal (on
 Mac or Linux) or the Anaconda prompt (on Windows).
 
 Note
