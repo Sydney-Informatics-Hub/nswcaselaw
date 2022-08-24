@@ -31,7 +31,7 @@ COURTS_FIELDS = ["courts", "tribunals"]
 RESULTS_RE = re.compile(r"Displaying \d+ - \d+ of (\d+)")
 PAGE_SIZE = 20
 
-SEARCH_PAUSE_SECONDS = 5
+SEARCH_PAUSE_SECONDS = 10
 
 
 class CaseLawException(Exception):
@@ -43,20 +43,19 @@ class Search:
     Class representing a CaseLaw query.
 
     Keyword args:
-        body (str)
-        title (str)
-        before (str) - name of judge etc
-        catchwords (str)
-        party (str)
-        mnc (str) - citation
-        startDate (str) - start date as "dd/mm/yyyy"
-        endDate (str) - end date as "dd/mm/yyyy"
-        fileNumber (str)
-        legislationCited (str)
-        casesCited (str)
-        courts (list of int) - indices starting at 1 from court list
-        tribunals (list of int) - indices starting at 1 from tribunals list
-
+      body (str)
+      title (str)
+      before (str) - name of judge etc
+      catchwords (str)
+      party (str)
+      mnc (str) - citation
+      startDate (str) - start date as "dd/mm/yyyy"
+      endDate (str) - end date as "dd/mm/yyyy"
+      fileNumber (str)
+      legislationCited (str)
+      casesCited (str)
+      courts (list of int) - indices starting at 1 from court list
+      tribunals (list of int) - indices starting at 1 from tribunals list
     """
 
     def __init__(self, **kwargs):
@@ -72,8 +71,7 @@ class Search:
     def build_query(self):
         """
         Converts the dict of search params into a list of tuples which can
-        be passed through requests. The reason for this is to imitate the
-        courts/tribunals selector
+        be passed
         """
         self._params = [("page", "")]  # initial query has no page
         self._params.extend(
@@ -98,11 +96,17 @@ class Search:
             params.append(("_" + court_type, "on"))
         return params
 
-    def query(self) -> Generator[Decision, None, None]:
+    def results(self) -> Generator[Decision, None, None]:
         """
         Runs a query against CaseLaw, repeating it for as many pages as are
-        needed to get all of the matching results. Pauses between pages so that
-        we don't get banned.
+        needed to get all of the matching results, pausing for an interval
+        between requests
+
+        Return:
+          Generator(Decision)
+
+        Raises:
+          CaseLawException on non-200 status code
         """
         self.build_query()
         _logger.info("Fetching page 1...")
@@ -112,7 +116,6 @@ class Search:
             if n_results == 0:
                 _logger.warning("No results matched your query")
                 return
-            _logger.warning(f"{n_results} {results}")
             for result in results:
                 yield result
         n_pages = (n_results - 1) // PAGE_SIZE + 1
@@ -128,7 +131,16 @@ class Search:
             else:
                 raise CaseLawException(f"Bad status_code {r.status_code}")
 
-    def scrape_results(self, html) -> List[str]:
+    def scrape_results(self, html) -> Tuple[int, List[Decision]]:
+        """Parse a page of search results and return the total number of
+        results and a list of Decision objects from this page of results
+
+        Args:
+          html (str): the HTML of the results page
+
+        Return:
+          Tuple of (int, List(Decision)): count of all results, and this page
+        """
         soup = BeautifulSoup(html, "html.parser")
         header_strings = list(soup.find("h1").stripped_strings)
         if len(header_strings) < 2:
@@ -139,12 +151,20 @@ class Search:
         n_results = int(m[1])
         if n_results:
             results = soup.find_all("div", {"class": "row result"})
-            decisions = [self.scrape_decision(r) for r in results]
+            decisions = [self.scrape_one_result(r) for r in results]
             return n_results, decisions
         else:
             return n_results, []
 
-    def scrape_decision(self, row):
+    def scrape_one_result(self, row):
+        """Scrape a single result and return a Decision, or None if the
+        scrape failed.
+
+        Args:
+          row: :obj:`bs4.element.Tag`
+        Return:
+          :obj:`nswcaselaw.decision.Decision`
+        """
         try:
             header = row.find("h4")
             link = header.find("a")

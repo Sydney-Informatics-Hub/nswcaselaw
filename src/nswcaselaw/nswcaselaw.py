@@ -1,4 +1,21 @@
+"""A module for downloading NSW case law decisions
+
+nswcaselaw is a module for downloading and parsing court and tribunal
+decisions from https://www.caselaw.nsw.gov.au/
+
+    from nswcaselaw.search import Search
+
+    search = Search(courts=[13], catchwords="defamation")
+
+    for decision in search.results():
+        print(f"Case: {decision.title}")
+        decision.fetch()
+        judgment = decision.judgment
+
+"""
+
 import argparse
+import csv
 import json
 import logging
 import sys
@@ -14,14 +31,6 @@ __copyright__ = "The University of Sydney"
 __license__ = "MIT"
 
 _logger = logging.getLogger(__name__)
-
-# WAIT_TIME
-
-
-# ---- CLI ----
-# The functions defined in this section are wrappers around the main Python
-# API allowing them to be called directly from the terminal as a CLI
-# executable/script.
 
 
 def parse_args(args):
@@ -97,10 +106,15 @@ def parse_args(args):
         help="Select one or more by index number (see --list tribunals)",
     )
     parser.add_argument(
+        "--output",
+        type=Path,
+        help="Search results will be written to this file as CSV",
+    )
+    parser.add_argument(
         "--download",
         type=Path,
         default=None,
-        help="Download full judgments and write JSON to this directory",
+        help="Save decisions as JSON to the directory DOWNLOAD",
     )
     parser.add_argument("--limit", type=int, default=None, help="Max results")
     return parser.parse_args(args)
@@ -119,15 +133,27 @@ def setup_logging(loglevel):
 
 
 def list_courts(court_type: str):
+    """Print a list of courts or tribunals, with indices, to stdout
+
+    Args:
+      court_type (str): either "courts" or "tribunals"
     """
-    Print a list of courts or tribunals, with indices, to stdout
-    """
-    for index, (_, name) in enumerate(COURTS[court_type]):
-        print(f"{index + 1:2d}. {name}")
-    print(SCRAPER_WARNING)
+    if court_type not in COURTS:
+        _logger.error("Court type must be either 'courts' or 'tribunals'")
+    else:
+        for index, (_, name) in enumerate(COURTS[court_type]):
+            print(f"{index + 1:2d}. {name}")
+        print(SCRAPER_WARNING)
 
 
-def test_scrape(test_file):
+def test_scrape(test_file: str):
+    """Load an HTML file and scrape it, printing the results as JSON.
+
+    Used for testing development of different scraper backends.
+
+    Args:
+      test_file (str): file to scrape
+    """
     d = Decision()
     if d.load_file(test_file):
         print(json.dumps(d.values, indent=2))
@@ -136,6 +162,13 @@ def test_scrape(test_file):
 
 
 def run_query(args: argparse.Namespace):
+    """Run a search query against caselaw, printing the search results as
+    CSV, and downloading the full decision text as JSON into a directory if
+    one is provided
+
+    Args:
+      :obj:`argparse.Namespace`: command line parameters namespace
+    """
     search = Search(
         body=args.body,
         title=args.title,
@@ -152,26 +185,54 @@ def run_query(args: argparse.Namespace):
         tribunals=args.tribunals,
     )
     n = 0
-    for decision in search.query():
-        if n == 0:
-            # only print the header if there's at least one result
-            print(",".join([f'"{f}"' for f in CSV_FIELDS]))
-        if args.download:
-            decision.fetch()
-            if args.dump:
-                htmlfile = (args.dump / decision.id).with_suffix(".html")
-                with open(htmlfile, "w") as fh:
-                    if decision.html is not None:
-                        fh.write(decision.html)
-                    else:
-                        fh.write("No content")
-            jsonfile = (args.download / decision.id).with_suffix(".json")
-            with open(jsonfile, "w") as fh:
-                fh.write(json.dumps(decision.values, indent=2))
-        print(decision.csv)
-        n += 1
-        if args.limit and n > args.limit:
-            return
+    with output_stream(args.output) as fh:
+        csvout = csv.writer(fh, dialect="excel")
+        for decision in search.results():
+            if n == 0:
+                # only print the header if there's at least one result
+                csvout.writerow(CSV_FIELDS)
+            if args.download:
+                download_decision(decision, args)
+            csvout.writerow(decision.row)
+            n += 1
+            if args.limit and n >= args.limit:
+                break
+
+
+def output_stream(outfile):
+    """Either opens a file for output, or returns stdout if the filename is
+    empty.
+
+    Args:
+      outfile (str): a filename or ''
+    Return:
+      :obj:`_io.TextIOWrapper`: an output stream
+    """
+    if outfile:
+        return open(outfile, "w", newline="")
+    else:
+        return sys.stdout
+
+
+def download_decision(decision, args):
+    """Fetch the full detains for a decision, and write out the JSON, and
+    optionally the HTML, to the download and dump directory
+
+    Args:
+      decision (:obj:`nswcaselaw.decision.Decision`): a decision
+      args: (:obj:`argparse.Namespace`:): the command-line args
+    """
+    decision.fetch()  # what happens if this fails?
+    if args.dump:
+        htmlfile = (args.dump / decision.id).with_suffix(".html")
+        with open(htmlfile, "w") as fh:
+            if decision.html is not None:
+                fh.write(decision.html)
+            else:
+                fh.write("No content")
+    jsonfile = (args.download / decision.id).with_suffix(".json")
+    with open(jsonfile, "w") as fh:
+        fh.write(json.dumps(decision.values, indent=2))
 
 
 def main(args):
