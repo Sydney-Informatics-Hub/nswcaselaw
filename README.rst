@@ -75,6 +75,12 @@ and then create a new environment as follows::
 You should now be able to use the ``nswcaselaw`` command from a terminal (on
 Mac or Linux) or the Anaconda prompt (on Windows).
 
+Acknowledgements
+================
+
+This project is partially funded by a 2022 University of Sydney Research
+Accelerator (SOAR) Prize awarded to Ben Chen.
+
 Note
 ====
 

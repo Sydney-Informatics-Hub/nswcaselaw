@@ -2,9 +2,13 @@
 Changelog
 =========
 
-Version 0.1
-===========
+Version 0.1.1
+=============
 
-- Feature A added
-- FIX: nasty bug #1729 fixed
-- add your changes here!
+Tidied up some leftover scaffolding
+
+Version 0.1.0
+=============
+
+Initial release
+
