@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 
 from nswcaselaw.constants import CASELAW_BASE_URL
 
-FETCH_PAUSE_SECONDS = 1 #10
+FETCH_PAUSE_SECONDS = 10  # 1
 
 SCRAPER_WARNING = """
 Warning: downloading full decisions has only been tested on the Supreme Court.
@@ -232,7 +232,6 @@ class Decision:
             self._warning(f"Scrape failed: {e}")
             return False
 
-
     def _get_scraper(self):
         """Using features from the parsed HTML, deduce which Scraper subclass
         should be used, instantiate it and return it
@@ -333,7 +332,6 @@ class Scraper:
             return "/".join(href[:3])
 
 
-
 class NewScScraper(Scraper):
     """Scraper for more recent Supreme Court judgments, which use a <dt> <dd>
     list for the metadata"""
@@ -360,16 +358,17 @@ class NewScScraper(Scraper):
         """Scrape the core metadata from the soup object.
            Store Decision under appeal as e.g.:
                     self._values['decisionUnderAppeal'] = {
-                        'Court or tribunal:': ['Supreme Court of New South Wales'], 
-                        'Jurisdiction:': ['Equity Division'], 
-                        'Date of Decision:': ['17 April 2018'], 
-                        'Before:': ['Pembroke J'], 
+                        'Court or tribunal:': ['Supreme Court of New South Wales'],
+                        'Jurisdiction:': ['Equity Division'],
+                        'Date of Decision:': ['17 April 2018'],
+                        'Before:': ['Pembroke J'],
                         'File Number(s):': ['2017/00120274']}"""
 
         decisionUnderAppeal = {}
         for dt in self._soup.find_all("dt"):
             header = dt.string
-            if header.strip() == "Decision under appeal": # if dt is Decision under appeal, read it into self._values
+            # if dt is Decision under appeal, read it into self._values
+            if header.strip() == "Decision under appeal":
                 div = dt.find_next_sibling("div")
                 for div_dt in div.find_all("dt"):
                     decisionUnderAppeal[div_dt.string.strip()] = []
