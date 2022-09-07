@@ -1,7 +1,5 @@
 """Classes for working with individual judgments
 """
-
-
 import logging
 import re
 import time
@@ -12,7 +10,7 @@ from bs4 import BeautifulSoup
 
 from nswcaselaw.constants import CASELAW_BASE_URL
 
-FETCH_PAUSE_SECONDS = 10
+FETCH_PAUSE_SECONDS = 1 #10
 
 SCRAPER_WARNING = """
 Warning: downloading full decisions has only been tested on the Supreme Court.
@@ -47,6 +45,8 @@ CSV_FIELDS = [
     "category",
     "fileNumber",
     "representation",
+    "courtOrTribunal",
+    "citation"
 ]
 
 
@@ -220,6 +220,7 @@ class Decision:
           Dict of (str: str): the scraped values
         """
         self._soup = BeautifulSoup(html, "html.parser")
+
         try:
             scraper = self._get_scraper()
             self._warning(f"Scraping with {scraper}")
@@ -230,6 +231,7 @@ class Decision:
         except Exception as e:
             self._warning(f"Scrape failed: {e}")
             return False
+
 
     def _get_scraper(self):
         """Using features from the parsed HTML, deduce which Scraper subclass
@@ -331,6 +333,7 @@ class Scraper:
             return "/".join(href[:3])
 
 
+
 class NewScScraper(Scraper):
     """Scraper for more recent Supreme Court judgments, which use a <dt> <dd>
     list for the metadata"""
@@ -346,22 +349,41 @@ class NewScScraper(Scraper):
         "catchwords": "Catchwords",
         "legislationCited": "Legislation Cited",
         "casesCited": "Cases Cited",
-        "parties": "Parties",
+        "textCited": "Texts Cited:",
         "category": "Category",
+        "parties": "Parties",
         "fileNumber": "File Number",
         "representation": "Representation",
     }
 
     def _scrape_metadata(self):
-        """Scrape the core metadata from the soup object"""
+        """Scrape the core metadata from the soup object.
+           Store Decision under appeal as e.g.:
+                    self._values['decisionUnderAppeal'] = {
+                        'Court or tribunal:': ['Supreme Court of New South Wales'], 
+                        'Jurisdiction:': ['Equity Division'], 
+                        'Date of Decision:': ['17 April 2018'], 
+                        'Before:': ['Pembroke J'], 
+                        'File Number(s):': ['2017/00120274']}"""
+
+        decisionUnderAppeal = {}
         for dt in self._soup.find_all("dt"):
-            dd = dt.find_next_sibling("dd")
             header = dt.string
-            paras = dd.find_all("p")
-            if paras:
-                self._raw[header] = [self._strings(p) for p in paras]
+            if header.strip() == "Decision under appeal": # if dt is Decision under appeal, read it into self._values
+                div = dt.find_next_sibling("div")
+                for div_dt in div.find_all("dt"):
+                    decisionUnderAppeal[div_dt.string.strip()] = []
+                    for s in div_dt.find_next_sibling("dd").stripped_strings:
+                        decisionUnderAppeal[div_dt.string.strip()].append(s)
+                break
+
             else:
-                self._raw[header] = self._strings(dd)
+                dd = dt.find_next_sibling("dd")
+                paras = dd.find_all("p")
+                if paras:
+                    self._raw[header] = [self._strings(p) for p in paras]
+                else:
+                    self._raw[header] = self._strings(dd)
 
         for field, substring in self.SUBSTRINGS.items():
             self._values[field] = self._find_value(substring)
@@ -372,7 +394,8 @@ class NewScScraper(Scraper):
         for f in ["catchwords", "legislationCited", "casesCited"]:
             self._values[f] = self._ensure_list(self._values[f])
 
-        self._values["decision"] = self._values["decision"][0]
+        if self._values["decision"] != '':
+            self._values["decision"] = self._values["decision"][0]
         self._values["catchwords"] = self._catchwords(self._values["catchwords"])
         for f in ["legislationCited", "casesCited"]:
             self._values[f] = self._fix_whitespace(self._values[f])
@@ -380,6 +403,7 @@ class NewScScraper(Scraper):
         self._values["parties"] = self._values["parties"].split("\n")
         self._values["representation"] = self._values["representation"].split("\n")
         self._values["judgment"] = self._scrape_judgment()
+        self._values["decisionUnderAppeal"] = decisionUnderAppeal
         return self._values
 
     def _ensure_list(self, value):
@@ -409,10 +433,13 @@ class NewScScraper(Scraper):
             if child.name == "h2":
                 paragraphs.append("##" + self._strings(child))
             elif child.name == "ol":
-                n = int(child["start"])
-                for li in child.find_all("li"):
-                    paragraphs.append(str(n) + " " + self._strings(li))
-                    n += 1
+                try:
+                    n = int(child["start"])
+                    for li in child.find_all("li"):
+                        paragraphs.append(str(n) + " " + self._strings(li))
+                        n += 1
+                except KeyError:
+                    pass
             elif child.name == "p":
                 if not self._ignored_paras(child):
                     text = self._strings(child)
