@@ -430,12 +430,12 @@ class NewScScraper(Scraper):
         paragraphs = []
         for child in body.children:
             if child.name == "h2":
-                paragraphs.append("##" + self._strings(child))
+                paragraphs.append(f"## {self._strings(child)}")
             elif child.name == "ol":
                 try:
                     n = int(child["start"])
                     for li in child.find_all("li"):
-                        paragraphs.append(str(n) + " " + self._strings(li))
+                        paragraphs.append(f"{n} {self._strings(li)}")
                         n += 1
                 except KeyError:
                     pass
