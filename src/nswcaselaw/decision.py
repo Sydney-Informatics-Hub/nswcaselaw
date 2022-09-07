@@ -46,7 +46,7 @@ CSV_FIELDS = [
     "fileNumber",
     "representation",
     "courtOrTribunal",
-    "citation"
+    "citation",
 ]
 
 
@@ -393,7 +393,7 @@ class NewScScraper(Scraper):
         for f in ["catchwords", "legislationCited", "casesCited"]:
             self._values[f] = self._ensure_list(self._values[f])
 
-        if self._values["decision"] != '':
+        if self._values["decision"] != "":
             self._values["decision"] = self._values["decision"][0]
         self._values["catchwords"] = self._catchwords(self._values["catchwords"])
         for f in ["legislationCited", "casesCited"]:

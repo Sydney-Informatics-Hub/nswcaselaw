@@ -56,5 +56,7 @@ def scrape_fixtures():
                 "2 Paragraph 2 of judgment",
                 "3 Paragraph 3 of judgment",
             ],
+            "decisionUnderAppeal": {},
+            'textCited': '',
         },
     }
