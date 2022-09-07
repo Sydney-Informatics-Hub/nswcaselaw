@@ -356,13 +356,13 @@ class NewScScraper(Scraper):
 
     def _scrape_metadata(self):
         """Scrape the core metadata from the soup object.
-           Store Decision under appeal as e.g.:
-                    self._values['decisionUnderAppeal'] = {
-                        'Court or tribunal:': ['Supreme Court of New South Wales'],
-                        'Jurisdiction:': ['Equity Division'],
-                        'Date of Decision:': ['17 April 2018'],
-                        'Before:': ['Pembroke J'],
-                        'File Number(s):': ['2017/00120274']}"""
+        Store Decision under appeal as e.g.:
+                 self._values['decisionUnderAppeal'] = {
+                     'Court or tribunal:': ['Supreme Court of New South Wales'],
+                     'Jurisdiction:': ['Equity Division'],
+                     'Date of Decision:': ['17 April 2018'],
+                     'Before:': ['Pembroke J'],
+                     'File Number(s):': ['2017/00120274']}"""
 
         decisionUnderAppeal = {}
         for dt in self._soup.find_all("dt"):
@@ -502,6 +502,8 @@ class OldScScraper(Scraper):
         if self._values["solicitors"] is not None:
             self._values["representation"] += self._values.pop("solicitors")
         self._values["judgment"] = self._scrape_judgment()
+        self._values["decisionUnderAppeal"] = {}
+        self._values["textCited"] = ""
         return self._values
 
     def _catchwords(self, catchwords):
