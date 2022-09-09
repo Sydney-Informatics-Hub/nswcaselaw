@@ -17,7 +17,7 @@ def test_basic_fields(scrape_fixtures):
     assert d.uri == md["uri"]
 
 
-@pytest.mark.parametrize("style", ["new", "old"])
+@pytest.mark.parametrize("style", ["new", "old", "coa"])
 def test_decision_scrape(scrape_fixtures, style):
     d = Decision()
     md = scrape_fixtures["metadata"]

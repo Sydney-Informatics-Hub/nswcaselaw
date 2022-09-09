@@ -1,7 +1,5 @@
 """Classes for working with individual judgments
 """
-
-
 import logging
 import re
 import time
@@ -12,7 +10,7 @@ from bs4 import BeautifulSoup
 
 from nswcaselaw.constants import CASELAW_BASE_URL
 
-FETCH_PAUSE_SECONDS = 10
+FETCH_PAUSE_SECONDS = 10  # 1
 
 SCRAPER_WARNING = """
 Warning: downloading full decisions has only been tested on the Supreme Court.
@@ -43,10 +41,12 @@ CSV_FIELDS = [
     "decision",
     "legislationCited",
     "casesCited",
+    "textsCited",
     "parties",
     "category",
     "fileNumber",
     "representation",
+    "decisionUnderAppeal",
 ]
 
 
@@ -109,6 +109,10 @@ class Decision:
         return self._values.get("casesCited")
 
     @property
+    def textsCited(self):
+        return self._values.get("textsCited")
+
+    @property
     def parties(self):
         return self._values.get("parties")
 
@@ -127,6 +131,10 @@ class Decision:
     @property
     def judgment(self):
         return self._values.get("judgment")
+
+    @property
+    def decisionUnderAppeal(self):
+        return self._values.get("decisionUnderAppeal")
 
     @property
     def id(self):
@@ -171,15 +179,29 @@ class Decision:
     @property
     def row(self):
         if self._row is None:
-            self._row = [self._flat_value(p) for p in CSV_FIELDS]
+            self._row = [self._flat_value(self._values, p) for p in CSV_FIELDS]
+
+            #  Appending the content in decisionUnderAppeal at the end of the row
+            decisionUnderAppeal = self._values["decisionUnderAppeal"]
+            self._row += [
+                self._flat_value(decisionUnderAppeal, p)
+                for p in decisionUnderAppeal.keys()
+            ]
         return self._row
 
-    def _flat_value(self, field):
-        v = self._values.get(field, "")
+    def _flat_value(self, dictionary, field):
+        v = dictionary.get(field, "")
         if type(v) == list:
             v = "; ".join(v)
         # v = v.replace('"', "'")
         return v
+
+    # Generate columns for decisionUnderAppeal, e.g. decisionUnderAppeal - Before
+    def decisionUnderAppealColumns(self):
+        return [
+            f"decisionUnderAppeal - {k}"
+            for k in self._values["decisionUnderAppeal"].keys()
+        ]
 
     def fetch(self):
         """Downloads the full decision from CaseLaw and scrapes it. Returns
@@ -220,6 +242,7 @@ class Decision:
           Dict of (str: str): the scraped values
         """
         self._soup = BeautifulSoup(html, "html.parser")
+
         try:
             scraper = self._get_scraper()
             self._warning(f"Scraping with {scraper}")
@@ -346,22 +369,44 @@ class NewScScraper(Scraper):
         "catchwords": "Catchwords",
         "legislationCited": "Legislation Cited",
         "casesCited": "Cases Cited",
-        "parties": "Parties",
+        "textsCited": "Texts Cited:",
         "category": "Category",
+        "parties": "Parties",
         "fileNumber": "File Number",
         "representation": "Representation",
     }
 
     def _scrape_metadata(self):
-        """Scrape the core metadata from the soup object"""
+        """Scrape the core metadata from the soup object.
+        Store Decision under appeal as e.g.:
+                 self._values['decisionUnderAppeal'] = {
+                     'Court or tribunal:': ['Supreme Court of New South Wales'],
+                     'Jurisdiction:': ['Equity Division'],
+                     'Date of Decision:': ['17 April 2018'],
+                     'Before:': ['Pembroke J'],
+                     'File Number(s):': ['2017/00120274']}"""
+
+        decisionUnderAppeal = {}
         for dt in self._soup.find_all("dt"):
-            dd = dt.find_next_sibling("dd")
             header = dt.string
-            paras = dd.find_all("p")
-            if paras:
-                self._raw[header] = [self._strings(p) for p in paras]
+            # if dt is Decision under appeal, read it into self._values
+            if header.strip() == "Decision under appeal":
+                div = dt.find_next_sibling("div")
+                for div_dt in div.find_all("dt"):
+                    try:
+                        decisionUnderAppeal[div_dt.string.strip()] = []
+                    except AttributeError:
+                        continue  # incase entry in decisionUnderAppeal is empty
+                    for s in div_dt.find_next_sibling("dd").stripped_strings:
+                        decisionUnderAppeal[div_dt.string.strip()].append(s)
+                break
             else:
-                self._raw[header] = self._strings(dd)
+                dd = dt.find_next_sibling("dd")
+                paras = dd.find_all("p")
+                if paras:
+                    self._raw[header] = [self._strings(p) for p in paras]
+                else:
+                    self._raw[header] = self._strings(dd)
 
         for field, substring in self.SUBSTRINGS.items():
             self._values[field] = self._find_value(substring)
@@ -372,7 +417,8 @@ class NewScScraper(Scraper):
         for f in ["catchwords", "legislationCited", "casesCited"]:
             self._values[f] = self._ensure_list(self._values[f])
 
-        self._values["decision"] = self._values["decision"][0]
+        if self._values["decision"] != "":  # some cases had were empty decision entries
+            self._values["decision"] = self._values["decision"][0]
         self._values["catchwords"] = self._catchwords(self._values["catchwords"])
         for f in ["legislationCited", "casesCited"]:
             self._values[f] = self._fix_whitespace(self._values[f])
@@ -380,6 +426,7 @@ class NewScScraper(Scraper):
         self._values["parties"] = self._values["parties"].split("\n")
         self._values["representation"] = self._values["representation"].split("\n")
         self._values["judgment"] = self._scrape_judgment()
+        self._values["decisionUnderAppeal"] = decisionUnderAppeal
         return self._values
 
     def _ensure_list(self, value):
@@ -407,12 +454,15 @@ class NewScScraper(Scraper):
         paragraphs = []
         for child in body.children:
             if child.name == "h2":
-                paragraphs.append("##" + self._strings(child))
+                paragraphs.append(f"## {self._strings(child)}")
             elif child.name == "ol":
-                n = int(child["start"])
-                for li in child.find_all("li"):
-                    paragraphs.append(str(n) + " " + self._strings(li))
-                    n += 1
+                try:
+                    n = int(child["start"])
+                    for li in child.find_all("li"):
+                        paragraphs.append(f"{n} {self._strings(li)}")
+                        n += 1
+                except KeyError:
+                    pass
             elif child.name == "p":
                 if not self._ignored_paras(child):
                     text = self._strings(child)
@@ -476,6 +526,8 @@ class OldScScraper(Scraper):
         if self._values["solicitors"] is not None:
             self._values["representation"] += self._values.pop("solicitors")
         self._values["judgment"] = self._scrape_judgment()
+        self._values["decisionUnderAppeal"] = {}
+        self._values["textsCited"] = ""
         return self._values
 
     def _catchwords(self, catchwords):

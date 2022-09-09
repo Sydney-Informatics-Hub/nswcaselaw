@@ -36,7 +36,7 @@ To generate a CSV of search results::
 
 To download complete decisions as JSON documents::
 
-  nswcaselaw --courts 13 --catchwords succession --output cases.csv  --downloads ./decisions
+  nswcaselaw --courts 13 --catchwords succession --output cases.csv  --download ./decisions
 
 To list available courts and tribunals (NOTE: full web scraping is only
 tested on Supreme Court decisions)::
