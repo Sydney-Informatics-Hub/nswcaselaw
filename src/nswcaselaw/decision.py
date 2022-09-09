@@ -41,12 +41,12 @@ CSV_FIELDS = [
     "decision",
     "legislationCited",
     "casesCited",
+    "textsCited",
     "parties",
     "category",
     "fileNumber",
     "representation",
-    "courtOrTribunal",
-    "citation",
+    "decisionUnderAppeal",
 ]
 
 
@@ -109,6 +109,10 @@ class Decision:
         return self._values.get("casesCited")
 
     @property
+    def textsCited(self):
+        return self._values.get("textsCited")
+
+    @property
     def parties(self):
         return self._values.get("parties")
 
@@ -127,6 +131,10 @@ class Decision:
     @property
     def judgment(self):
         return self._values.get("judgment")
+
+    @property
+    def decisionUnderAppeal(self):
+        return self._values.get("decisionUnderAppeal")
 
     @property
     def id(self):
@@ -347,7 +355,7 @@ class NewScScraper(Scraper):
         "catchwords": "Catchwords",
         "legislationCited": "Legislation Cited",
         "casesCited": "Cases Cited",
-        "textCited": "Texts Cited:",
+        "textsCited": "Texts Cited:",
         "category": "Category",
         "parties": "Parties",
         "fileNumber": "File Number",
@@ -371,11 +379,13 @@ class NewScScraper(Scraper):
             if header.strip() == "Decision under appeal":
                 div = dt.find_next_sibling("div")
                 for div_dt in div.find_all("dt"):
-                    decisionUnderAppeal[div_dt.string.strip()] = []
+                    try:
+                        decisionUnderAppeal[div_dt.string.strip()] = []
+                    except AttributeError:
+                        continue  # incase entry in decisionUnderAppeal is empty
                     for s in div_dt.find_next_sibling("dd").stripped_strings:
                         decisionUnderAppeal[div_dt.string.strip()].append(s)
                 break
-
             else:
                 dd = dt.find_next_sibling("dd")
                 paras = dd.find_all("p")
@@ -393,7 +403,7 @@ class NewScScraper(Scraper):
         for f in ["catchwords", "legislationCited", "casesCited"]:
             self._values[f] = self._ensure_list(self._values[f])
 
-        if self._values["decision"] != "":
+        if self._values["decision"] != "":  # some cases had were empty decision entries
             self._values["decision"] = self._values["decision"][0]
         self._values["catchwords"] = self._catchwords(self._values["catchwords"])
         for f in ["legislationCited", "casesCited"]:
@@ -503,7 +513,7 @@ class OldScScraper(Scraper):
             self._values["representation"] += self._values.pop("solicitors")
         self._values["judgment"] = self._scrape_judgment()
         self._values["decisionUnderAppeal"] = {}
-        self._values["textCited"] = ""
+        self._values["textsCited"] = ""
         return self._values
 
     def _catchwords(self, catchwords):

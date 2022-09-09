@@ -19,6 +19,7 @@ def scrape_fixtures():
     return {
         "old": fixtures_dir / "scrape_old.html",
         "new": fixtures_dir / "scrape_new.html",
+        "coa": fixtures_dir / "scrape_new_coa.html",
         "metadata": {
             "uri": "/decision/2c1e283b2906fafbccdd156f",
             "title": "Jarndyce v Jarndyce",
@@ -57,6 +58,6 @@ def scrape_fixtures():
                 "3 Paragraph 3 of judgment",
             ],
             "decisionUnderAppeal": {},
-            "textCited": "",
+            "textsCited": "",
         },
     }
