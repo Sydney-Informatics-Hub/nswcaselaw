@@ -179,15 +179,29 @@ class Decision:
     @property
     def row(self):
         if self._row is None:
-            self._row = [self._flat_value(p) for p in CSV_FIELDS]
+            self._row = [self._flat_value(self._values, p) for p in CSV_FIELDS]
+
+            #  Appending the content in decisionUnderAppeal at the end of the row
+            decisionUnderAppeal = self._values["decisionUnderAppeal"]
+            self._row += [
+                self._flat_value(decisionUnderAppeal, p)
+                for p in decisionUnderAppeal.keys()
+            ]
         return self._row
 
-    def _flat_value(self, field):
-        v = self._values.get(field, "")
+    def _flat_value(self, dictionary, field):
+        v = dictionary.get(field, "")
         if type(v) == list:
             v = "; ".join(v)
         # v = v.replace('"', "'")
         return v
+
+    # Generate columns for decisionUnderAppeal, e.g. decisionUnderAppeal - Before
+    def decisionUnderAppealColumns(self):
+        return [
+            f"decisionUnderAppeal - {k}"
+            for k in self._values["decisionUnderAppeal"].keys()
+        ]
 
     def fetch(self):
         """Downloads the full decision from CaseLaw and scrapes it. Returns

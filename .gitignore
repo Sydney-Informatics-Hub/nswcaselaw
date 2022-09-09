@@ -54,6 +54,10 @@ MANIFEST
 .python-version
 
 xw/
+decisions/
 
 test
 test.cpp
+test.csv
+cases.csv
+example.csv
