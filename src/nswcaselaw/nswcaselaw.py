@@ -188,9 +188,21 @@ def run_query(args: argparse.Namespace):
     with output_stream(args.output) as fh:
         csvout = csv.writer(fh, dialect="excel")
         for decision in search.results():
+            decision.fetch()
             if n == 0:
                 # only print the header if there's at least one result
-                csvout.writerow(CSV_FIELDS + decision.decisionUnderAppealColumns())
+                try:  # Output decisionUnderAppealColumns only if it exists
+                    csvout.writerow(
+                        CSV_FIELDS
+                        + list(
+                            map(
+                                lambda x: x.strip(":"),
+                                decision.decisionUnderAppealColumns(),
+                            )
+                        )
+                    )
+                except KeyError:
+                    csvout.writerow(CSV_FIELDS)
             if args.download:
                 download_decision(decision, args)
             csvout.writerow(decision.row)

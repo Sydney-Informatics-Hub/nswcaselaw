@@ -180,13 +180,15 @@ class Decision:
     def row(self):
         if self._row is None:
             self._row = [self._flat_value(self._values, p) for p in CSV_FIELDS]
-
-            #  Appending the content in decisionUnderAppeal at the end of the row
-            decisionUnderAppeal = self._values["decisionUnderAppeal"]
-            self._row += [
-                self._flat_value(decisionUnderAppeal, p)
-                for p in decisionUnderAppeal.keys()
-            ]
+            try:
+                # Appending the content in decisionUnderAppeal at the end of the row
+                decisionUnderAppeal = self._values["decisionUnderAppeal"]
+                self._row += [
+                    self._flat_value(decisionUnderAppeal, p)
+                    for p in decisionUnderAppeal.keys()
+                ]
+            except KeyError:
+                pass
         return self._row
 
     def _flat_value(self, dictionary, field):

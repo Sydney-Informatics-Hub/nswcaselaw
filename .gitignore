@@ -55,6 +55,7 @@ MANIFEST
 
 xw/
 decisions/
+decision/
 
 test
 test.cpp
