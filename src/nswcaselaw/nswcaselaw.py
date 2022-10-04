@@ -23,7 +23,7 @@ from pathlib import Path
 
 from nswcaselaw import __version__
 from nswcaselaw.constants import COURTS
-from nswcaselaw.decision import CSV_FIELDS, SCRAPER_WARNING, Decision
+from nswcaselaw.decision import SCRAPER_WARNING, Decision
 from nswcaselaw.search import Search
 
 __author__ = "Mike Lynch"
@@ -188,21 +188,9 @@ def run_query(args: argparse.Namespace):
     with output_stream(args.output) as fh:
         csvout = csv.writer(fh, dialect="excel")
         for decision in search.results():
-            decision.fetch()
             if n == 0:
                 # only print the header if there's at least one result
-                try:  # Output decisionUnderAppealColumns only if it exists
-                    csvout.writerow(
-                        CSV_FIELDS
-                        + list(
-                            map(
-                                lambda x: x.strip(":"),
-                                decision.decisionUnderAppealColumns(),
-                            )
-                        )
-                    )
-                except KeyError:
-                    csvout.writerow(CSV_FIELDS)
+                csvout.writerow(decision.header)
             if args.download:
                 download_decision(decision, args)
             csvout.writerow(decision.row)
