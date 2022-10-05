@@ -55,9 +55,12 @@ MANIFEST
 
 xw/
 decisions/
+decision/
 
 test
 test.cpp
 test.csv
 cases.csv
 example.csv
+decisionUnderAppeal.txt
+judgment.txt
