@@ -18,11 +18,12 @@ import argparse
 import csv
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 
 from nswcaselaw import __version__
-from nswcaselaw.constants import COURTS
+from nswcaselaw.constants import CASELAW_BASE_URL, COURTS
 from nswcaselaw.decision import CSV_FIELDS, SCRAPER_WARNING, Decision
 from nswcaselaw.search import Search
 
@@ -104,6 +105,9 @@ def parse_args(args):
         nargs="+",
         default=[],
         help="Select one or more by index number (see --list tribunals)",
+    )
+    parser.add_argument(
+        "--uris", type=Path, default=None, help="CSV file with caselaw URIs"
     )
     parser.add_argument(
         "--output",
@@ -199,6 +203,28 @@ def run_query(args: argparse.Namespace):
                 break
 
 
+def download_uris(args: argparse.Namespace):
+    """Loads a spreadsheet with caselaw URLs and downloads and parses each
+    decision.
+
+    Args:
+      :obj:`argparse.Namespace`: command line parameters namespace
+    """
+
+    n = 0
+    with output_stream(args.output) as fh:
+        csvout = csv.writer(fh, dialect="excel")
+        for uri in load_uris_from_csv(args.uris):
+            print(uri)
+            decision = Decision(uri=uri)
+            if args.download:
+                download_decision(decision, args)
+                csvout.writerow(decision.row)
+                n += 1
+                if args.limit and n >= args.limit:
+                    break
+
+
 def output_stream(outfile):
     """Either opens a file for output, or returns stdout if the filename is
     empty.
@@ -235,6 +261,25 @@ def download_decision(decision, args):
         fh.write(json.dumps(decision.values, indent=2))
 
 
+def load_uris_from_csv(csvfile):
+    """
+    Read a CSV file and get everything which looks like a caselaw URL and
+    return it as a Generator of str
+    Args:
+        csvfile(:obj:`pathlib.Path`)
+    Return:
+        Generator(str)
+    """
+    url_re = re.compile(CASELAW_BASE_URL + "(/decision/[a-f0-9]+)")
+    with open(csvfile, "r", newline="") as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            for val in row:
+                m = url_re.match(val)
+                if m:
+                    yield m.group(1)
+
+
 def main(args):
     """
     Args:
@@ -249,17 +294,20 @@ def main(args):
         if args.list:
             list_courts(args.list)
         else:
-            if not (args.courts or args.tribunals):
-                _logger.error(
-                    """
+            if args.uris:
+                download_uris(args)
+            else:
+                if not (args.courts or args.tribunals):
+                    _logger.error(
+                        """
 You must select at least one court or tribunal.
 
 Use the --list courts or --list tribunals options for a list of available
 options.
 """
-                )
-            else:
-                run_query(args)
+                    )
+                else:
+                    run_query(args)
 
 
 def run():
