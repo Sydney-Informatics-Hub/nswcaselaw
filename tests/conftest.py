@@ -57,7 +57,14 @@ def scrape_fixtures():
                 "2 Paragraph 2 of judgment",
                 "3 Paragraph 3 of judgment",
             ],
-            "decisionUnderAppeal": {},
+            "decisionUnderAppeal": {
+                "Court or tribunal": [],
+                "Jurisdiction": [],
+                "Citation": [],
+                "Date of Decision": [],
+                "Before": [],
+                "File Number(s)": [],
+            },
             "textsCited": "",
         },
     }

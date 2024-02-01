@@ -46,7 +46,6 @@ CSV_FIELDS = [
     "category",
     "fileNumber",
     "representation",
-    "decisionUnderAppeal",
 ]
 
 
@@ -62,6 +61,7 @@ class Decision:
         self._values = {}
         for field in BASE_FIELDS:
             self._values[field] = kwargs.get(field)
+        self._header = None
         self._row = None
 
     @property
@@ -177,11 +177,9 @@ class Decision:
     #     return self._csv
 
     @property
-    def row(self):
+    def row(self):  # self.fetch() needs to be called before using this function
         if self._row is None:
             self._row = [self._flat_value(self._values, p) for p in CSV_FIELDS]
-
-            #  Appending the content in decisionUnderAppeal at the end of the row
             decisionUnderAppeal = self._values["decisionUnderAppeal"]
             self._row += [
                 self._flat_value(decisionUnderAppeal, p)
@@ -189,19 +187,29 @@ class Decision:
             ]
         return self._row
 
+    @property
+    def header(self):
+        self._header = CSV_FIELDS + self.decisionUnderAppealColumns()
+        return self._header
+
+    # Generate columns for decisionUnderAppeal, e.g. decisionUnderAppeal - Before
+    def decisionUnderAppealColumns(self):
+        decisionUnderAppeal = {
+            "Court or tribunal": [],
+            "Jurisdiction": [],
+            "Citation": [],
+            "Date of Decision": [],
+            "Before": [],
+            "File Number(s)": [],
+        }
+        return [f"decisionUnderAppeal - {k}" for k in decisionUnderAppeal.keys()]
+
     def _flat_value(self, dictionary, field):
         v = dictionary.get(field, "")
         if type(v) == list:
             v = "; ".join(v)
         # v = v.replace('"', "'")
         return v
-
-    # Generate columns for decisionUnderAppeal, e.g. decisionUnderAppeal - Before
-    def decisionUnderAppealColumns(self):
-        return [
-            f"decisionUnderAppeal - {k}"
-            for k in self._values["decisionUnderAppeal"].keys()
-        ]
 
     def fetch(self):
         """Downloads the full decision from CaseLaw and scrapes it. Returns
@@ -382,23 +390,28 @@ class NewScScraper(Scraper):
                  self._values['decisionUnderAppeal'] = {
                      'Court or tribunal:': ['Supreme Court of New South Wales'],
                      'Jurisdiction:': ['Equity Division'],
+                     'Citation': [],
                      'Date of Decision:': ['17 April 2018'],
                      'Before:': ['Pembroke J'],
                      'File Number(s):': ['2017/00120274']}"""
 
-        decisionUnderAppeal = {}
+        self._values["decisionUnderAppeal"] = {
+            "Court or tribunal": [],
+            "Jurisdiction": [],
+            "Citation": [],
+            "Date of Decision": [],
+            "Before": [],
+            "File Number(s)": [],
+        }
         for dt in self._soup.find_all("dt"):
             header = dt.string
             # if dt is Decision under appeal, read it into self._values
             if header.strip() == "Decision under appeal":
                 div = dt.find_next_sibling("div")
                 for div_dt in div.find_all("dt"):
-                    try:
-                        decisionUnderAppeal[div_dt.string.strip()] = []
-                    except AttributeError:
-                        continue  # incase entry in decisionUnderAppeal is empty
+                    key = div_dt.string.strip().strip(":")
                     for s in div_dt.find_next_sibling("dd").stripped_strings:
-                        decisionUnderAppeal[div_dt.string.strip()].append(s)
+                        self._values["decisionUnderAppeal"][key].append(s)
                 break
             else:
                 dd = dt.find_next_sibling("dd")
@@ -426,7 +439,6 @@ class NewScScraper(Scraper):
         self._values["parties"] = self._values["parties"].split("\n")
         self._values["representation"] = self._values["representation"].split("\n")
         self._values["judgment"] = self._scrape_judgment()
-        self._values["decisionUnderAppeal"] = decisionUnderAppeal
         return self._values
 
     def _ensure_list(self, value):
@@ -528,6 +540,14 @@ class OldScScraper(Scraper):
         self._values["judgment"] = self._scrape_judgment()
         self._values["decisionUnderAppeal"] = {}
         self._values["textsCited"] = ""
+        self._values["decisionUnderAppeal"] = {
+            "Court or tribunal": [],
+            "Jurisdiction": [],
+            "Citation": [],
+            "Date of Decision": [],
+            "Before": [],
+            "File Number(s)": [],
+        }
         return self._values
 
     def _catchwords(self, catchwords):
