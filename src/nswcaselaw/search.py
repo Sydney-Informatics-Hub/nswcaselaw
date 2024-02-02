@@ -66,10 +66,28 @@ class Search:
             self._query[field] = kwargs.get(field)
         self._pause = kwargs.get("pause", DEFAULT_PAUSE)
         self._params = None
+        self._url = None
 
     @property
     def params(self):
         return self._params
+
+    @property
+    def url(self):
+        """
+        Returns the url of the search without running it - using a
+        requests.Request object to build it the same way requests.get does
+        """
+        if self._url is None:
+            self.build_query()
+            req = requests.Request(
+                method="GET",
+                url=CASELAW_SEARCH_URL,
+                params=self._params,
+            )
+            preq = req.prepare()
+            self._url = preq.url
+        return self._url
 
     def build_query(self):
         """
