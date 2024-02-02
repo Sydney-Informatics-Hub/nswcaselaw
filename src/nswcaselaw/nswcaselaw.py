@@ -194,7 +194,7 @@ def run_query(args: argparse.Namespace):
         for decision in search.results():
             if n == 0:
                 # only print the header if there's at least one result
-                csvout.writerow(CSV_FIELDS + decision.decisionUnderAppealColumns())
+                csvout.writerow(CSV_FIELDS)
             if args.download:
                 download_decision(decision, args)
             csvout.writerow(decision.row)
