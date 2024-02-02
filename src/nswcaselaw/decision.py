@@ -180,11 +180,12 @@ class Decision:
     def row(self):  # self.fetch() needs to be called before using this function
         if self._row is None:
             self._row = [self._flat_value(self._values, p) for p in CSV_FIELDS]
-            decisionUnderAppeal = self._values["decisionUnderAppeal"]
-            self._row += [
-                self._flat_value(decisionUnderAppeal, p)
-                for p in decisionUnderAppeal.keys()
-            ]
+            if "decisionUnderAppeal" in self._values:
+                decisionUnderAppeal = self._values["decisionUnderAppeal"]
+                self._row += [
+                    self._flat_value(decisionUnderAppeal, p)
+                    for p in decisionUnderAppeal.keys()
+                ]
         return self._row
 
     @property
