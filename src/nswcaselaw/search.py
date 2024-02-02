@@ -31,7 +31,7 @@ COURTS_FIELDS = ["courts", "tribunals"]
 RESULTS_RE = re.compile(r"Displaying \d+ - \d+ of (\d+)")
 PAGE_SIZE = 20
 
-SEARCH_PAUSE_SECONDS = 10
+DEFAULT_PAUSE = 10
 
 
 class CaseLawException(Exception):
@@ -56,12 +56,15 @@ class Search:
       casesCited (str)
       courts (list of int) - indices starting at 1 from court list
       tribunals (list of int) - indices starting at 1 from tribunals list
+      pause (int) - amount of time to wait between searchs, defaults to
+                    SEARCH_PAUSE_SECONDS
     """
 
     def __init__(self, **kwargs):
         self._query = {}
         for field in TEXT_FIELDS + COURTS_FIELDS:
             self._query[field] = kwargs.get(field)
+        self._pause = kwargs.get("pause", DEFAULT_PAUSE)
         self._params = None
 
     @property
@@ -120,7 +123,7 @@ class Search:
                 yield result
         n_pages = (n_results - 1) // PAGE_SIZE + 1
         for page in range(1, n_pages):
-            time.sleep(SEARCH_PAUSE_SECONDS)
+            time.sleep(self._pause)
             self._params[0] = ("page", str(page))
             _logger.info(f"Fetching page {page + 1} of {n_pages}...")
             r = requests.get(CASELAW_SEARCH_URL, self._params)
