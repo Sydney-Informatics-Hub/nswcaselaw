@@ -20,11 +20,15 @@ Sample usage in Python code or a Jupyter notebook::
   from nswcaselaw.search import Search
   import json
 
-  query = Search(courts=[13], catchwords="succession")
+  query = Search(courts=[13], catchwords="succession", pause=1)
 
   for decision in query.results():
       decision.fetch()
       print(json.dumps(decision.values, indent=2))
+
+  # url returns the URL of the search query as a string
+
+  url = query.url
 
 
 CLI tool 
@@ -43,6 +47,41 @@ tested on Supreme Court decisions)::
 
   nswcaselaw --list courts
   nswcaselaw --list tribunals
+
+Command-line parameters:
+
+  -h, --help            show help message and exit
+  --version             show program's version number and exit
+  -v, --verbose         set loglevel to INFO
+  -vv, --very-verbose   set loglevel to DEBUG
+  --list {courts,tribunals}
+                        Print a list of courts or tribunals
+  --dump DUMP           Dir to dump HTML for debugging
+  --test-parse TEST_PARSE
+                        Test scraper on an HTML document and print results as
+                        JSON
+  --body BODY           Full text search
+  --title TITLE         Case name
+  --before BEFORE
+  --catchwords CATCHWORDS
+  --party PARTY
+  --citation CITATION   This must include square brackets
+  --startDate STARTDATE
+                        Earliest decision date
+  --endDate ENDDATE     Lastest decision date
+  --fileNumber FILENUMBER
+  --legislationCited LEGISLATIONCITED
+  --casesCited CASESCITED
+  --pause PAUSE         Seconds to wait between requests: default 10
+  --courts COURTS [COURTS ...]
+                        Select one or more by index number (see --list courts)
+  --tribunals TRIBUNALS [TRIBUNALS ...]
+                        Select one or more by index number (see --list
+                        tribunals)
+  --uris URIS           CSV file with caselaw URIs to download
+  --output OUTPUT       Search results will be written to this file as CSV
+  --download DOWNLOAD   Save decisions as JSON to the directory DOWNLOAD
+  --limit LIMIT         Max results
   
 
 Installation

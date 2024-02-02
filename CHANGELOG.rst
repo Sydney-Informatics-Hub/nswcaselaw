@@ -8,13 +8,14 @@ Version 0.1.2
 Features:
 
 * Parses decision-under-appeal metadata where available
+* Rate-limiting pause between requests can now be passed as a parameter to
+  the Search object
+* Search.url property which returns the URL which will be requested
 
 Bugs:
 
 * fixed a bug in handling new-format cases which was breaking some Court of
   Appeals cases
-
-
 
 Version 0.1.1
 =============
