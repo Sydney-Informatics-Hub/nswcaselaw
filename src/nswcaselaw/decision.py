@@ -204,7 +204,7 @@ class Decision:
 
     def _flat_value(self, dictionary, field):
         v = dictionary.get(field, "")
-        if type(v) == list:
+        if type(v) is list:
             v = "; ".join(v)
         # v = v.replace('"', "'")
         return v
