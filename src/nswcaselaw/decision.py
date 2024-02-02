@@ -2,15 +2,12 @@
 """
 import logging
 import re
-import time
 from typing import List
 
 import requests
 from bs4 import BeautifulSoup
 
 from nswcaselaw.constants import CASELAW_BASE_URL
-
-FETCH_PAUSE_SECONDS = 10  # 1
 
 SCRAPER_WARNING = """
 Warning: downloading full decisions has only been tested on the Supreme Court.
@@ -211,7 +208,6 @@ class Decision:
           dict of str: str
         """
         r = requests.get(CASELAW_BASE_URL + self.uri)
-        time.sleep(FETCH_PAUSE_SECONDS)
         if r.status_code == 200:
             self._html = r.text
             return self.scrape(self._html)

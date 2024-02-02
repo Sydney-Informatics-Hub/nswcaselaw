@@ -20,12 +20,13 @@ import json
 import logging
 import re
 import sys
+import time
 from pathlib import Path
 
 from nswcaselaw import __version__
 from nswcaselaw.constants import CASELAW_BASE_URL, COURTS
 from nswcaselaw.decision import CSV_FIELDS, SCRAPER_WARNING, Decision
-from nswcaselaw.search import Search
+from nswcaselaw.search import DEFAULT_PAUSE, Search
 
 __author__ = "Mike Lynch"
 __copyright__ = "The University of Sydney"
@@ -92,6 +93,11 @@ def parse_args(args):
     parser.add_argument("--fileNumber", type=str)
     parser.add_argument("--legislationCited", type=str)
     parser.add_argument("--casesCited", type=str)
+    parser.add_argument(
+        "--pause",
+        type=int,
+        help=f"Seconds to wait between requests, default {DEFAULT_PAUSE}",
+    )
     parser.add_argument(
         "--courts",
         type=int,
@@ -187,6 +193,7 @@ def run_query(args: argparse.Namespace):
         casesCited=args.casesCited,
         courts=args.courts,
         tribunals=args.tribunals,
+        pause=args.pause,
     )
     n = 0
     with output_stream(args.output) as fh:
@@ -196,6 +203,7 @@ def run_query(args: argparse.Namespace):
                 # only print the header if there's at least one result
                 csvout.writerow(CSV_FIELDS + decision.decisionUnderAppealColumns())
             if args.download:
+                time.sleep(args.pause)
                 download_decision(decision, args)
             csvout.writerow(decision.row)
             n += 1
