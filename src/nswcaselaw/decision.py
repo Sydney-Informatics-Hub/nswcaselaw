@@ -1,5 +1,6 @@
 """Classes for working with individual judgments
 """
+
 import logging
 import re
 from typing import List
