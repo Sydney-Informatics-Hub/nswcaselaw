@@ -443,7 +443,7 @@ class NewScScraper(Scraper):
         delimited by <p> tags, but are separated by newlines. This method
         normalises them into lists of strings.
         """
-        if type(value) == list:
+        if type(value) is list:
             return value
         else:
             return value.split("\n")
