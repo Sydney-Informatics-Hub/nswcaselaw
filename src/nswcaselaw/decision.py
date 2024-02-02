@@ -1,16 +1,14 @@
 """Classes for working with individual judgments
 """
+
 import logging
 import re
-import time
 from typing import List
 
 import requests
 from bs4 import BeautifulSoup
 
 from nswcaselaw.constants import CASELAW_BASE_URL
-
-FETCH_PAUSE_SECONDS = 10  # 1
 
 SCRAPER_WARNING = """
 Warning: downloading full decisions has only been tested on the Supreme Court.
@@ -180,11 +178,12 @@ class Decision:
     def row(self):  # self.fetch() needs to be called before using this function
         if self._row is None:
             self._row = [self._flat_value(self._values, p) for p in CSV_FIELDS]
-            decisionUnderAppeal = self._values["decisionUnderAppeal"]
-            self._row += [
-                self._flat_value(decisionUnderAppeal, p)
-                for p in decisionUnderAppeal.keys()
-            ]
+            if "decisionUnderAppeal" in self._values:
+                decisionUnderAppeal = self._values["decisionUnderAppeal"]
+                self._row += [
+                    self._flat_value(decisionUnderAppeal, p)
+                    for p in decisionUnderAppeal.keys()
+                ]
         return self._row
 
     @property
@@ -206,7 +205,7 @@ class Decision:
 
     def _flat_value(self, dictionary, field):
         v = dictionary.get(field, "")
-        if type(v) == list:
+        if type(v) is list:
             v = "; ".join(v)
         # v = v.replace('"', "'")
         return v
@@ -219,7 +218,6 @@ class Decision:
           dict of str: str
         """
         r = requests.get(CASELAW_BASE_URL + self.uri)
-        time.sleep(FETCH_PAUSE_SECONDS)
         if r.status_code == 200:
             self._html = r.text
             return self.scrape(self._html)
@@ -446,7 +444,7 @@ class NewScScraper(Scraper):
         delimited by <p> tags, but are separated by newlines. This method
         normalises them into lists of strings.
         """
-        if type(value) == list:
+        if type(value) is list:
             return value
         else:
             return value.split("\n")
