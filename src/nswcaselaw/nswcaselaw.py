@@ -88,14 +88,15 @@ def parse_args(args):
     parser.add_argument("--catchwords", type=str)
     parser.add_argument("--party", type=str)
     parser.add_argument("--citation", type=str, help="Must include square brackets")
-    parser.add_argument("--startDate", type=str, help="Earliest decision date")
-    parser.add_argument("--endDate", type=str, help="Lastest decision date")
+    parser.add_argument("--startDate", type=str, help="Earliest decision date as dd/mm/yyyy")
+    parser.add_argument("--endDate", type=str, help="Lastest decision date as dd/mm/yyyy")
     parser.add_argument("--fileNumber", type=str)
     parser.add_argument("--legislationCited", type=str)
     parser.add_argument("--casesCited", type=str)
     parser.add_argument(
         "--pause",
         type=int,
+        default=DEFAULT_PAUSE,
         help=f"Seconds to wait between requests, default {DEFAULT_PAUSE}",
     )
     parser.add_argument(
@@ -226,6 +227,7 @@ def download_uris(args: argparse.Namespace):
             print(uri)
             decision = Decision(uri=uri)
             if args.download:
+                time.sleep(args.pause)
                 download_decision(decision, args)
                 csvout.writerow(decision.row)
                 n += 1
