@@ -81,7 +81,9 @@ class Search:
         if self._url is None:
             self.build_query()
             req = requests.Request(
-                method="GET", url=CASELAW_SEARCH_URL, params=self._params,
+                method="GET",
+                url=CASELAW_SEARCH_URL,
+                params=self._params,
             )
             preq = req.prepare()
             self._url = preq.url
