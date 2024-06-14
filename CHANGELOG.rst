@@ -2,6 +2,16 @@
 Changelog
 =========
 
+Version 0.1.4
+=============
+
+Bugs:
+
+* Sensible default for rate-limiting pause
+
+* Rate-limiting is applied consistently
+
+
 Version 0.1.3
 =============
 
