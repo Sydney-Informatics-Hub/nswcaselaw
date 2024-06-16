@@ -10,7 +10,7 @@ Sample usage in Python code or a Jupyter notebook
     from nswcaselaw.search import Search
     import json
 
-    query = Search(courts=[13], catchwords="succession", pause=1)
+    query = Search(courts=[13], catchwords="succession")
 
     for decision in query.results():
       decision.fetch()
